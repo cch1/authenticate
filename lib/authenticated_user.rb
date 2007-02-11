@@ -113,7 +113,7 @@ module Authentication
       end
   
       def new_security_token(hours = nil)
-        write_attribute('security_token', AuthenticatedUser.hash([Array.new(30){rand(256).chr}.join].pack("m").chomp))
+        write_attribute('security_token', Digest::SHA512.hexdigest([Array.new(30){rand(256).chr}.join].pack("m").chomp)[0..39])
         write_attribute('token_expiry', Time.at(Time.now.to_i + token_lifetime(hours)))
         update_without_callbacks
         return self.security_token
