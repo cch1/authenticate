@@ -58,7 +58,7 @@ module Authentication
       end
   
       def password?(password)
-        match = (AuthenticatedUser.encrypt(self.salt, password) == self.salted_password)
+        match = (AuthenticatedUser.encrypt(self.salt, password) == self.hashed_password)
         match && verified && !deleted
       end
       
@@ -78,7 +78,7 @@ module Authentication
       end
   
       def valid_password?
-        !(salted_password.length == 0)
+        !(hashed_password.length == 0)
       end
       
       def generate_security_token(hours = nil)
@@ -115,7 +115,7 @@ module Authentication
         # This method should only really be called if password is valid, so check for errors to avoid writing garbage.
         if @new_password and !self.errors[:password]
           write_attribute("salt", AuthenticatedUser.salt)
-          write_attribute("salted_password", AuthenticatedUser.encrypt(salt, @password))
+          write_attribute("hashed_password", AuthenticatedUser.encrypt(salt, @password))
         end
       end
   
