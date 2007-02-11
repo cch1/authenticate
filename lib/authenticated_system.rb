@@ -37,7 +37,7 @@ module Authentication
     # Manage response to authentication failure.
     def access_denied
       headers["Status"] = "Unauthorized"
-      headers["WWW-Authenticate"] = "Basic realm=\"#{AppConfig.usermgmt['app_name']}\""
+      headers["WWW-Authenticate"] = "Basic realm=\"#{Authentication::Configuration[:realm]}\""
       respond_to do |accepts|
         accepts.html do
           store_location

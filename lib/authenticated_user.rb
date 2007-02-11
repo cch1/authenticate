@@ -79,7 +79,7 @@ module Authentication
       end
   
       def set_delete_after
-        hours = AppConfig.usermgmt['delayed_delete_days'] * 24
+        hours = Authentication::Configuration[:delete_delay] * 24
         write_attribute('deleted', true)
         write_attribute('delete_after', Time.at(Time.now.to_i + hours * 60 * 60))
   
@@ -122,7 +122,7 @@ module Authentication
       def token_lifetime(hours = nil)
         if hours.nil?
           # Get configured token life, or default (24)
-          AppConfig.usermgmt['security_token_life_hours'] * 60 * 60
+          Authentication::Configuration[:security_token_life] * 60 * 60
         else
           hours * 60 * 60
         end
