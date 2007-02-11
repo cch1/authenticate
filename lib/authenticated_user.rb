@@ -19,17 +19,7 @@ module Authentication
         include InstanceMethods
   
         attr_accessor :new_password
-        
-        validates_presence_of :login
-        validates_length_of :login, :within => 3..40
-        validates_uniqueness_of :login
-        validates_format_of :email, :with => /^[^@]+@.+$/
-    
-        validates_presence_of :password, :if => :validate_password?
-        validates_confirmation_of :password, :if => :validate_password?
-        validates_length_of :password, { :minimum => 5, :if => :validate_password? }
-        validates_length_of :password, { :maximum => 40, :if => :validate_password? }
-  
+
         protected 
         attr_accessor :password, :password_confirmation
         after_save :falsify_new_password
@@ -50,11 +40,9 @@ module Authentication
     end
 
     module InstanceMethods
-      def initialize(attributes = nil)
-        attributes[:login] ||= User.generate_login(attributes[:email].split('@')[0]) if attributes && attributes[:email]
+      def initialize(*args)
         super
-        @new_password = false      
-        self.theme = AppConfig.usermgmt['default_theme']
+        @new_password = false
       end
   
       def password?(password)
