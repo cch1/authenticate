@@ -89,7 +89,7 @@ module Authentication
   
     # Attempt to authenticate with session cookie
     def user_by_session_cookie
-      session[:user] && User.find_by_id(session[:user])
+      session[:user] && User.find(session[:user])
     end
   
     private
