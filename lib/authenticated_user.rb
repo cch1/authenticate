@@ -66,7 +66,7 @@ module Authentication
       end
   
       def valid_password?
-        !(hashed_password.length == 0)
+        hashed_password && !(hashed_password.length == 0)
       end
       
       def generate_security_token(hours = nil)
