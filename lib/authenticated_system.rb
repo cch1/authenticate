@@ -59,7 +59,8 @@ module Authentication
       if session[:return_to].nil?
         redirect_to default
       else
-        redirect_to_url session[:return_to]
+        breakpoint
+        redirect_to session[:return_to]
         session[:return_to] = nil
       end
     end
@@ -68,7 +69,7 @@ module Authentication
       if request.env["HTTP_REFERER"].nil?
         redirect_to default
       else
-        redirect_to(request.env["HTTP_REFERER"]) # same as redirect_to :back
+        redirect_to :back
       end
     end
 
