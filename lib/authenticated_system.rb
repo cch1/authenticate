@@ -59,7 +59,6 @@ module Authentication
       if session[:return_to].nil?
         redirect_to default
       else
-        breakpoint
         redirect_to session[:return_to]
         session[:return_to] = nil
       end
