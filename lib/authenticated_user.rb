@@ -57,7 +57,8 @@ module Authentication
       end
       
       def token_expired?
-        self.security_token and self.token_expiry and (Time.now > self.token_expiry.to_time)
+        raise Authenticate::InvalidTokenExpiry if self.security_token and !self.token_expiry
+        self.security_token and (Time.now > self.token_expiry.to_time)
       end
   
       def update_expiry
