@@ -34,22 +34,14 @@ module Authentication
       false
     end
 
-    # Manage response to authentication failure.
+    # Manage response to authentication failure.  Override this method
+    # in your application.rb controller.
     def access_denied
-      headers["Status"] = "Unauthorized"
-      headers["WWW-Authenticate"] = "Basic realm=\"#{Authentication::Configuration[:realm]}\""
-      respond_to do |accepts|
-        accepts.html do
-          store_location
-          # if stored is login, consider returning 401 for HTTP Auth?
-          redirect_to login_path
-        end
-        accepts.xml { render :text => "Authentication failure; access denied.", :status => 401 }
-      end
+      raise Authenticate::AuthenticationError
     end  
   
-    # store current uri in  the session.
-    # we can return to this location by calling return_location
+    # Store current URI in the session.
+    # We can return to this location by calling return_location
     def store_location
       session[:return_to] = request.request_uri
     end
