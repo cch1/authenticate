@@ -5,7 +5,7 @@ module Authentication
     # Returns the current user
     def current_user
       return @current_user if @current_user
-      self.current_user = user_by_session_cookie || user_by_http_auth || user_by_token
+      self.current_user = user_by_session_cookie || user_by_authentication_cookie || user_by_http_auth || user_by_token
     end
     alias logged_in? current_user
 
@@ -72,11 +72,18 @@ module Authentication
       end
     end
 
-    # Attempt to authenticate with a url-encoded token
+    # Attempt to authenticate with a URL-encoded security token
     def user_by_token
-      if params[:user_id]
-        User.authenticate_by_token(params[:user_id], params[:key])
+      User.authenticate_by_token(params[:security_token])
+    end
+    
+    # Attempt to authenticate with a cookie-based security token
+    def user_by_authentication_cookie
+      if (user = User.authenticate_by_token(cookies[:authentication_token]))
+        user.bump_token_expiry # Could regenerate token instead for nonce behavior
+        cookies[:authentication_token] = { :value => user.security_token , :expires => user.token_expiry }
       end
+      return user
     end
     
     # Attempt to authenticate with HTTP Auth information
