@@ -28,13 +28,14 @@ module Authentication
     end
 
     module SingletonMethods
-      def authenticate(login, password)
+      def authenticate_by_password(login, password)
         u = self.find_by_login(login) rescue nil
         u && u.password?(password) ? u : nil
-      end 
+      end
+      alias authenticate authenticate_by_password
 
-      def authenticate_by_token(id, token)
-        u = self.find(id) rescue nil
+      def authenticate_by_token(token)
+        u = self.find_by_security_token(token) rescue nil
         u && u.token?(token) ? u : nil
       end      
     end
