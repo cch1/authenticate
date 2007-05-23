@@ -29,14 +29,15 @@ module Authentication
 
     module SingletonMethods
       def authenticate_by_password(login, password)
-        u = self.find_by_login(login) rescue nil
+        u = self.find_by_login(login)
         u && u.password?(password) ? u : nil
       end
       alias authenticate authenticate_by_password
 
       def authenticate_by_token(token)
-        u = self.find_by_security_token(token) rescue nil
-        u && u.token?(token) ? u : nil
+        sleep(1)
+        u = self.find_by_security_token(token)
+        u && u.valid_token? ? u : nil
       end      
     end
 
@@ -47,23 +48,20 @@ module Authentication
       end
   
       def password?(password)
-        match = (AuthenticatedUser.encrypt(self.salt, password) == self.hashed_password)
-        match && verified && !deleted
+        AuthenticatedUser.encrypt(self.salt, password) == self.hashed_password         
       end
       
-      def token?(token)
-        sleep(1)
-        match = (token == security_token) 
-        match && !self.token_expired? && self.update_expiry
+      def valid_token?
+        security_token && !self.token_expired?
       end
       
       def token_expired?
-        raise Authenticate::InvalidTokenExpiry if self.security_token and !self.token_expiry
-        self.security_token and (Time.now > self.token_expiry.to_time)
+        raise Authenticate::InvalidTokenExpiry unless self.token_expiry.is_a?(Time)
+        Time.now > self.token_expiry
       end
   
-      def update_expiry
-        write_attribute('token_expiry', [self.token_expiry.to_time, Time.at(Time.now.to_i + 600 * 1000)].min)
+      def bump_token_expiry(h = nil)
+        write_attribute('token_expiry', h || Authentication::Configuration[:security_token_life].hours.from_now)
         update_without_callbacks
       end
   
@@ -72,22 +70,17 @@ module Authentication
       end
       
       def generate_security_token(hours = nil)
-        if not hours.nil? or self.security_token.nil? or self.token_expiry.nil? or 
-            (Time.now.to_i + token_lifetime / 2) >= self.token_expiry.to_i
-          return new_security_token(hours)
-        else
-          return self.security_token
-        end
+          new_security_token(hours)
       end
   
       def set_delete_after
-        hours = Authentication::Configuration[:delete_delay] * 24
+        h = Authentication::Configuration[:delete_delay] * 24
         write_attribute('deleted', true)
-        write_attribute('delete_after', Time.at(Time.now.to_i + hours * 60 * 60))
+        write_attribute('delete_after', h.hours.from_now)
   
         # Generate and return a token here, so that it expires at
         # the same time that the account deletion takes effect.
-        return generate_security_token(hours)
+        return generate_security_token(h)
       end
   
       def change_password(pass, confirm = nil)
@@ -116,19 +109,10 @@ module Authentication
   
       def new_security_token(hours = nil)
         write_attribute('security_token', Digest::SHA512.hexdigest([Array.new(30){rand(256).chr}.join].pack("m").chomp)[0..39])
-        write_attribute('token_expiry', Time.at(Time.now.to_i + token_lifetime(hours)))
+        write_attribute('token_expiry', (hours || Authentication::Configuration[:security_token_life]).hours.from_now)
         update_without_callbacks
         return self.security_token
       end
-  
-      def token_lifetime(hours = nil)
-        if hours.nil?
-          # Get configured token life, or default (24)
-          Authentication::Configuration[:security_token_life] * 60 * 60
-        else
-          hours * 60 * 60
-        end
-      end # method
     end # module
   end # module
 end # module
