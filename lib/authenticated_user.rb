@@ -1,4 +1,4 @@
-module Authentication
+module Authenticate
   module AuthenticatedUser
 
     def self.salt
@@ -61,7 +61,7 @@ module Authentication
       end
   
       def bump_token_expiry(h = nil)
-        write_attribute('token_expiry', h || Authentication::Configuration[:security_token_life].hours.from_now)
+        write_attribute('token_expiry', h || Authenticate::Configuration[:security_token_life].hours.from_now)
         update_without_callbacks
       end
   
@@ -74,7 +74,7 @@ module Authentication
       end
   
       def set_delete_after
-        h = Authentication::Configuration[:delete_delay] * 24
+        h = Authenticate::Configuration[:delete_delay] * 24
         write_attribute('deleted', true)
         write_attribute('delete_after', h.hours.from_now)
   
@@ -109,7 +109,7 @@ module Authentication
   
       def new_security_token(hours = nil)
         write_attribute('security_token', Digest::SHA512.hexdigest([Array.new(30){rand(256).chr}.join].pack("m").chomp)[0..39])
-        write_attribute('token_expiry', (hours || Authentication::Configuration[:security_token_life]).hours.from_now)
+        write_attribute('token_expiry', (hours || Authenticate::Configuration[:security_token_life]).hours.from_now)
         update_without_callbacks
         return self.security_token
       end

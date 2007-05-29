@@ -1,4 +1,4 @@
-module Authentication
+module Authenticate
   module AuthenticatedSystem
     
     protected
