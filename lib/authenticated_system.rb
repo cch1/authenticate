@@ -2,36 +2,30 @@ module Authenticate
   module AuthenticatedSystem
     
     protected
-    # Returns the current user
+    # Returns the current user.  No implicit logging in occurs.
     def current_user
-      return @current_user if @current_user
-      self.current_user = user_by_session_cookie || user_by_authentication_cookie || user_by_http_auth || user_by_token
+      @current_user
     end
     alias logged_in? current_user
-
-    # Allows current_user and logged_in? to be used in views.    
-    def self.included(base)
-      ActionController::Base.send :helper_method, :current_user, :logged_in?
-      if base.respond_to?(:rescue_responses)
-        base.rescue_responses['Authenticate::AuthenticationError'] = :unauthorized # Poorly named -it really is intended for 'unauthenticated'.
-      end
-    end
     
+    # Assigns the current_user, effectively performing login and logout operations.
     def current_user=(u)
       @current_user = u
       User.current = u
       if u
         session[:user] = u.id
-      else
+      else # remove persistence
+        cookies.delete :authentication_token
         session[:user] = u
       end
     end
     
+    # Checks for an authenticated user, implicitly logging him in if present.
     # Authentication Filter.  Usage:
     #   before_filter :authentication, :only => [:actionx, :actiony]
     #   skip_before_filter :authentication, :only => [:actionx]
-    #   etc.
     def authentication
+      self.current_user = self.authenticated_user
       return true if logged_in?
       access_denied
       false
@@ -65,6 +59,19 @@ module Authenticate
       else
         redirect_to :back
       end
+    end
+
+    # Allows current_user and logged_in? to be used in views.    
+    def self.included(base)
+      ActionController::Base.send :helper_method, :current_user, :logged_in?
+      if base.respond_to?(:rescue_responses)
+        base.rescue_responses['Authenticate::AuthenticationError'] = :unauthorized # Poorly named -it really is intended for 'unauthenticated'.
+      end
+    end
+    
+    # Identifies the authenticated user, if any.
+    def authenticated_user
+      user_by_session_cookie || user_by_authentication_cookie || user_by_http_auth || user_by_token
     end
 
     # Attempt to authenticate with a URL-encoded security token
