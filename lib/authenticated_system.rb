@@ -14,9 +14,11 @@ module Authenticate
       User.current = u
       if u
         session[:user] = u.id
+        session[:authentication_method] ||= @authentication_method
       else # remove persistence
         cookies.delete :authentication_token
-        session[:user] = u
+        session[:user] = nil
+        session[:authentication_method] = nil
       end
     end
     
@@ -25,7 +27,7 @@ module Authenticate
     #   before_filter :authentication, :only => [:actionx, :actiony]
     #   skip_before_filter :authentication, :only => [:actionx]
     def authentication
-      self.current_user = self.authenticated_user
+      self.current_user = self.authenticated_user # this is the login
       return true if logged_in?
       access_denied
       false
@@ -71,16 +73,20 @@ module Authenticate
     
     # Identifies the authenticated user, if any.
     def authenticated_user
-      user_by_session_cookie || user_by_authentication_cookie || user_by_http_auth || user_by_token
+      u = user_by_session_cookie || user_by_authentication_cookie || user_by_http_auth || user_by_token
+      @authentication_method = nil unless u
+      u
     end
 
     # Attempt to authenticate with a URL-encoded security token
     def user_by_token
+      @authentication_method = :token
       User.authenticate_by_token(params[:security_token])
     end
     
     # Attempt to authenticate with a cookie-based security token
     def user_by_authentication_cookie
+      @authentication_method = :cookie
       if (user = User.authenticate_by_token(cookies[:authentication_token]))
         user.bump_token_expiry # Could regenerate token instead for nonce behavior
         cookies[:authentication_token] = { :value => user.security_token , :expires => user.token_expiry }
@@ -90,6 +96,7 @@ module Authenticate
     
     # Attempt to authenticate with HTTP Auth information
     def user_by_http_auth
+      @authentication_method = :http_authentication
       user, password = get_http_auth_data
       if user
         User.authenticate(user, password)
@@ -98,6 +105,7 @@ module Authenticate
   
     # Attempt to authenticate with session cookie
     def user_by_session_cookie
+      @authentication_method = :session # This should never be an *initial* authentication method.
       session[:user] && User.find(session[:user])
     end
   
