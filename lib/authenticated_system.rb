@@ -18,7 +18,7 @@ module Authenticate
           u.bump_token_expiry # Could regenerate token instead for nonce behavior
           cookies[:authentication_token] = { :value => u.security_token , :expires => u.token_expiry }
         end
-        session[:authentication_method] = @authentication_method # Record authentication method used at login.
+        session[:authentication_method] ||= @authentication_method # Record authentication method used at login.
         session[:user] = u.id
         logger.info "Authentication: User #{u.login} logged in via #{session[:authentication_method]} and authenticated via #{@authentication_method}."
       else # remove persistence
