@@ -98,7 +98,7 @@ module Authenticate
         # This method should only really be called if password is valid, so check for errors to avoid writing garbage.
         if @new_password and !self.errors[:password]
           write_attribute("salt", AuthenticatedUser.salt)
-          write_attribute("hashed_password", AuthenticatedUser.encrypt(salt, @password))
+          write_attribute("hashed_password", AuthenticatedUser.encrypt(self.salt, @password))
         end
       end
   
