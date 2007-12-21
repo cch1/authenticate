@@ -11,8 +11,6 @@ module Authenticate
     # Assigns the current_user, effectively performing login and logout operations.
     def current_user=(u)
       return if @current_user == u
-      @current_user = u
-      User.current = u
       if u
         if cookies[:authentication_token]
           u.bump_token_expiry # Could regenerate token instead for nonce behavior
@@ -25,8 +23,10 @@ module Authenticate
         cookies.delete :authentication_token
         session[:user] = nil
         session[:authentication_method] = nil
-        logger.info "User logged out."
+        logger.info "User #{@current_user} logged out."
       end
+      @current_user = u
+      User.current = u
     end
     
     # Checks for an authenticated user, implicitly logging him in if present.
@@ -78,46 +78,43 @@ module Authenticate
       end
     end
     
-    # Identifies the authenticated user, if any.
+    # Identifies the authenticated user, if any.  Override/chain this method to add implicit guest 
+    # or other application-specific authentication methods.
     def authenticated_user
-      user_by_session_cookie || user_by_authentication_cookie || user_by_http_auth || user_by_token
+      user_by_session || user_by_authentication_cookie || user_by_http_auth || user_by_token
     end
 
     # Attempt to authenticate with a URL-encoded security token
     def user_by_token
-      logger.debug "Authentication: attempting to authenticate via token."
+      return unless params[:security_token]
       if (user = User.authenticate_by_token(params[:security_token]))
         @authentication_method = :token
-        logger.debug "Authentication: authenticated #{user.login} via token."
       end
       user
     end
     
     # Attempt to authenticate with a cookie-based security token
     def user_by_authentication_cookie
-      logger.debug "Authentication: attempting to authenticate via authentication cookie."
+      return unless cookies[:authentication_token]
       if (user = User.authenticate_by_token(cookies[:authentication_token]))
         @authentication_method = :cookie
-        logger.debug "Authentication: authenticated #{user.login} via authentication cookie."
       end
       user
     end
     
     # Attempt to authenticate with HTTP Auth information
     def user_by_http_auth
-      logger.debug "Authentication: attempting to authenticate via HTTP Auth."
       if user = authenticate_with_http_basic { |uid, pwd| User.authenticate(uid, pwd) }
         @authentication_method = :http_authentication
       end
       user
     end
   
-    # Attempt to authenticate with session cookie
-    def user_by_session_cookie
-      logger.debug "Authentication: attempting to authenticate via session."
-      if (user = session[:user] && User.find(session[:user]))
+    # Attempt to authenticate with session data.
+    def user_by_session
+      return unless session[:user]
+      if (user = User.find(session[:user]))
         @authentication_method = :session # This should never be an *initial* authentication method.        
-        logger.debug "Authentication: authenticated #{user.login} via session cookie."
       end
       user
     end
