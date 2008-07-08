@@ -20,6 +20,11 @@ module Authenticate
   
         attr_accessor :new_password
 
+        validates_presence_of :login
+        validates_uniqueness_of :login
+        validates_presence_of :password, :if => :validate_password?
+        validates_confirmation_of :password, :if => :validate_password?
+
         protected 
         attr_accessor :password, :password_confirmation
         after_save :falsify_new_password
