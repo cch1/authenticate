@@ -1,8 +1,17 @@
-ENV['RAILS_ENV'] = 'test'
-ENV['RAILS_ROOT'] ||= File.dirname(__FILE__) + '/../../../..'
-
 require 'test/unit'
-require File.expand_path(File.join(ENV['RAILS_ROOT'], 'config/environment.rb'))
+
+# Boot Rails
+ENV['RAILS_ENV'] = 'test'
+RAILS_GEM_VERSION = '2.1.0' unless defined? RAILS_GEM_VERSION
+require File.expand_path(File.join(File.dirname(__FILE__) + '/../../../../config/boot.rb'))
+Rails::Initializer.run { |config| }
+# Remove the host application (../app/...) from the dependency and load paths.
+ActiveSupport::Dependencies.load_paths.delete_if {|path| /app\//.match(path) }
+ActiveSupport::Dependencies.load_once_paths.delete_if {|path| /app\//.match(path) }
+$LOAD_PATH.delete_if {|path| /app\//.match(path) }
+# Add our testing library directory to the load path.
+$LOAD_PATH.unshift(File.dirname(__FILE__) + '/lib')
+
 require 'active_record/fixtures'
 
 config = YAML::load(IO.read(File.dirname(__FILE__) + '/database.yml'))
@@ -35,7 +44,3 @@ load(File.dirname(__FILE__) + "/schema.rb")
 Test::Unit::TestCase.fixture_path = File.dirname(__FILE__) + "/fixtures"
 
 require File.dirname(__FILE__) + '/../init.rb'
-
-class User < ActiveRecord::Base
-  authenticated
-end
