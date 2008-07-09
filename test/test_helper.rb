@@ -1,20 +1,18 @@
 require 'test/unit'
 
-# Boot Rails
+# Boot Rails manually, instead of via the environment.rb file.  This help limit the impact of the host application.
 ENV['RAILS_ENV'] = 'test'
 RAILS_GEM_VERSION = '2.1.0' unless defined? RAILS_GEM_VERSION
 require File.expand_path(File.join(File.dirname(__FILE__) + '/../../../../config/boot.rb'))
-Rails::Initializer.run { |config| }
+Rails::Initializer.run
+
 # Remove the host application (../app/...) from the dependency and load paths.
 ActiveSupport::Dependencies.load_paths.delete_if {|path| /app\//.match(path) }
 ActiveSupport::Dependencies.load_once_paths.delete_if {|path| /app\//.match(path) }
 $LOAD_PATH.delete_if {|path| /app\//.match(path) }
+
 # Add our testing library directory to the load path.
 $LOAD_PATH.unshift(File.dirname(__FILE__) + '/lib')
-
-require 'active_record/fixtures'
-
-config = YAML::load(IO.read(File.dirname(__FILE__) + '/database.yml'))
 
 ActiveRecord::Base.logger = Logger.new(File.dirname(__FILE__) + "/debug.log")
 
@@ -37,10 +35,18 @@ if db_adapter.nil?
   raise "No DB Adapter selected. Pass the DB= option to pick one, or install Sqlite or Sqlite3." 
 end
 
-ActiveRecord::Base.establish_connection(config[db_adapter])
+db_config = YAML::load(IO.read(File.dirname(__FILE__) + '/database.yml'))
+ActiveRecord::Base.establish_connection(db_config[db_adapter])
 
 load(File.dirname(__FILE__) + "/schema.rb")
 
+require 'active_record/fixtures'
 Test::Unit::TestCase.fixture_path = File.dirname(__FILE__) + "/fixtures"
 
+class Test::Unit::TestCase
+  self.use_transactional_fixtures = true
+  self.use_instantiated_fixtures  = false
+end
+
+# Initialize our plugin.
 require File.dirname(__FILE__) + '/../init.rb'
