@@ -40,6 +40,8 @@ ActiveRecord::Base.establish_connection(db_config[db_adapter])
 
 load(File.dirname(__FILE__) + "/schema.rb")
 
+require 'action_controller/test_process'
+
 require 'active_record/fixtures'
 Test::Unit::TestCase.fixture_path = File.dirname(__FILE__) + "/fixtures"
 
