@@ -1,12 +1,14 @@
 module Authenticate
   module AuthenticatedTestHelper
     # Sets the current user in the session from the user fixtures.
-    def login_as(user)    
+    def login_as(user, method = :post)    
       if user
         u = users(user)
         @request.session[:user] = u.id
+        @request.session[:authentication_method] = method
       else
-        @request.session[:user] = u
+        @request.session[:user] = nil
+        @request.session[:authentication_method] = nil 
       end
     end
   
