@@ -1,6 +1,7 @@
 require 'test/unit'
 
 # Boot Rails manually, instead of via the environment.rb file.  This help limit the impact of the host application.
+# Plugins are booted as a consequence of booting Rails.
 ENV['RAILS_ENV'] = 'test'
 RAILS_GEM_VERSION = '2.1.0' unless defined? RAILS_GEM_VERSION
 require File.expand_path(File.join(File.dirname(__FILE__) + '/../../../../config/boot.rb'))
@@ -49,3 +50,6 @@ class Test::Unit::TestCase
   self.use_transactional_fixtures = true
   self.use_instantiated_fixtures  = false
 end
+
+# Change the encryption parameters (but not the process) to speed up tests
+Authenticate::Configuration.merge!({:hash_iterations => 2, :authentication_delay => 0.01.seconds})
