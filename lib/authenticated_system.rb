@@ -9,35 +9,36 @@ module Authenticate
     alias logged_in? current_user
     
     # Assigns the current_user, effectively performing login and logout operations.
+    # TODO: Should work even if sessions are disabled.
     def current_user=(u)
-      return if @current_user == u
       if u
         if cookies[:authentication_token]
           u.bump_token_expiry # Could regenerate token instead for nonce behavior
           cookies[:authentication_token] = { :value => u.security_token , :expires => u.token_expiry }
         end
-        session[:authentication_method] ||= @authentication_method # Record authentication method used at login.
+        session[:authentication_method] ||= (@authentication_method || :unknown) # Record authentication method used at login.
         session[:user] = u.id
         logger.info "Authentication: User #{u.login} logged in via #{session[:authentication_method]} and authenticated via #{@authentication_method}."
       else # remove persistence
         cookies.delete :authentication_token
         session[:user] = nil
         session[:authentication_method] = nil
-        logger.info "User #{@current_user} logged out."
+        logger.info "Authentication: User #{@current_user} logged out."
       end
       @current_user = u
-      User.current = u
+      User.current = u # This is a nasty coupling that should be eliminated...
     end
     
     # Checks for an authenticated user, implicitly logging him in if present.
     # Authentication Filter.  Usage:
-    #   before_filter :authentication, :only => [:actionx, :actiony]
+    #   prepend_before_filter :authentication, :only => [:actionx, :actiony]
     #   skip_before_filter :authentication, :only => [:actionx]
+    # TODO: This should be an around filter, and authentication state should be cleared everywhere but the session after each request.
     def authentication
-      self.current_user = self.authenticated_user # this is the login
-      return true if logged_in?
-      access_denied
-      false
+      returning self.authenticated_user do |u|
+        self.current_user = u # this is the login
+        access_denied unless u
+      end
     end
 
     # Manage response to authentication failure.  Override this method
@@ -70,7 +71,7 @@ module Authenticate
       end
     end
 
-    # Allows current_user and logged_in? to be used in views.    
+    # Allows current_user and logged_in? to be used in views.  Also sets up a rescue response where supported.
     def self.included(base)
       ActionController::Base.send :helper_method, :current_user, :logged_in?
       if base.respond_to?(:rescue_responses)

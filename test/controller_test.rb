@@ -5,6 +5,27 @@ class ControllerTest < ActionController::TestCase
   fixtures :users
   
   tests UsersController
+  
+  test 'should start unauthenticated' do
+    assert_nil User.current
+    assert_nil @controller.send(:current_user)    
+  end
+  
+  test 'should login' do
+    post :login, :user => {:login => users(:chris).login}
+    assert @controller.send(:logged_in?), 'User should be authenticated.'
+    assert_equal users(:chris), User.current
+    assert_equal users(:chris), @controller.send(:current_user)
+    assert_equal :unknown, @request.session[:authentication_method]
+  end
+
+  test 'should logout' do
+    post :login, :user => {:login => users(:chris).login}
+    delete :logout
+    assert !@controller.send(:logged_in?), 'User should not be authenticated.'
+    assert_nil User.current
+    assert_nil @controller.send(:current_user)    
+  end
 
   test 'should require authentication by default' do
     assert_raises Authenticate::AuthenticationError do
@@ -17,6 +38,8 @@ class ControllerTest < ActionController::TestCase
     users(:chris).generate_security_token
     get :new, :security_token => users(:chris).security_token
     assert @controller.send(:logged_in?), "User should be authenticated."
+    assert_equal :token, @controller.instance_variable_get(:@authentication_method)
+    assert_equal :token, @request.session[:authentication_method]
   end
 
   test 'should not authenticate by invalid token' do
@@ -24,6 +47,7 @@ class ControllerTest < ActionController::TestCase
       get :new, :security_token => 'InvalidToken'
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
   test 'should not authenticate by expired token' do
@@ -33,12 +57,15 @@ class ControllerTest < ActionController::TestCase
       get :new, :security_token => users(:chris).security_token
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
   test 'should authenticate by session' do
     @request.session[:user] = users(:chris).id
     get :new
     assert @controller.send(:logged_in?), "User should be authenticated."
+    assert_equal :session, @controller.instance_variable_get(:@authentication_method)
+    assert_equal :session, @request.session[:authentication_method]
   end
 
   test 'should not authenticate by nil session' do
@@ -47,12 +74,15 @@ class ControllerTest < ActionController::TestCase
       get :new
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
   test 'should authenticate by HTTP_AUTHORIZATION' do
     @request.env['HTTP_AUTHORIZATION'] = ActionController::HttpAuthentication::Basic.encode_credentials(users(:chris).login, 'Cruft')
     get :new
     assert @controller.send(:logged_in?), "User should be authenticated."
+    assert_equal :http_authentication, @controller.instance_variable_get(:@authentication_method)
+    assert_equal :http_authentication, @request.session[:authentication_method]
   end
 
   test 'should not authenticate by invalid HTTP_AUTHORIZATION' do
@@ -61,6 +91,7 @@ class ControllerTest < ActionController::TestCase
       head :new
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
   test 'should authenticate by cookie' do
@@ -68,6 +99,8 @@ class ControllerTest < ActionController::TestCase
     @request.cookies["authentication_token"] = cookie_for(:chris)
     head :new
     assert @controller.send(:logged_in?), "User should be authenticated."
+    assert_equal :cookie, @controller.instance_variable_get(:@authentication_method)
+    assert_equal :cookie, @request.session[:authentication_method]
   end
 
   test 'should not authenticate by cookie with invalid token' do
@@ -77,6 +110,7 @@ class ControllerTest < ActionController::TestCase
       head :new
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
   test 'should not authenticate by cookie with expired token' do
@@ -87,6 +121,7 @@ class ControllerTest < ActionController::TestCase
       head :new
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
   protected
