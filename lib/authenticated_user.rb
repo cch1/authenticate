@@ -1,28 +1,5 @@
 module Authenticate
   module AuthenticatedUser
-    SALT_LENGTH = 128
-    HASH_LENGTH = 128
-    TOKEN_LENGTH = 64
-    # Generate a random Base64-encoded salt string to prevent pre-calculated dictionary attacks and collisions.  Newlines are
-    # removed from the string to ensure DB compatibility (SQLite!).
-    # http://phpsec.org/articles/2005/password-hashing.html
-    def self.salt
-      [Array.new(0.75 * SALT_LENGTH){rand(256).chr}.join].pack("m").gsub(/\n/, '')[0..SALT_LENGTH - 1]
-    end
-    
-    # Hash the password and salt iteratively.  The value of iteration has apparently been questioned in the cryptographic 
-    # community (see reference one below), but assumed practical in the applied art of password management (as shown in 
-    # references two and three) in increasing the amount of time required to execute a dictionary attack.
-    # http://www.linuxworld.com/cgi-bin/mailto/x_linux.cgi?pagetosend=/export/home/httpd/linuxworld/news/2007/111207-hash.html
-    # http://macshadows.com/kb/index.php?title=Mac_OS_X_password_hashes
-    # http://www.adamberent.com/documents/KeyIterations&CryptoSalts.pdf
-    def self.encrypt(salt, password)
-      key = salt + password
-      # Light up the CPU
-      Authenticate::Configuration[:hash_iterations].times { key = Digest::SHA512.hexdigest(key) }
-      key[0..HASH_LENGTH - 1]
-    end
-
     module ClassMethods
       def authenticated
         require 'digest/sha2'
@@ -54,6 +31,29 @@ module Authenticate
         u = self.find_by_security_token(token)
         u && u.valid_token? ? u : nil
       end      
+      
+      # Generate a random Base64-encoded salt string to prevent pre-calculated dictionary attacks and collisions.  Newlines are
+      # removed from the string to ensure DB compatibility (SQLite!).
+      # http://phpsec.org/articles/2005/password-hashing.html
+      def salt
+        salt_length = self.columns_hash['salt'].limit
+        [Array.new(0.75 * salt_length){rand(256).chr}.join].pack("m").gsub(/\n/, '')[0..salt_length - 1]
+      end
+      
+      # Hash the password and salt iteratively.  The value of iteration has apparently been questioned in the cryptographic 
+      # community (see reference one below), but assumed practical in the applied art of password management (as shown in 
+      # references two and three) in increasing the amount of time required to execute a dictionary attack.
+      # http://www.linuxworld.com/cgi-bin/mailto/x_linux.cgi?pagetosend=/export/home/httpd/linuxworld/news/2007/111207-hash.html
+      # http://macshadows.com/kb/index.php?title=Mac_OS_X_password_hashes
+      # http://www.adamberent.com/documents/KeyIterations&CryptoSalts.pdf
+      def encrypt(salt, password)
+        hash_length = self.columns_hash['hashed_password'].limit
+        key = salt + password
+        # Light up the CPU
+        raise "Missing configuration value" unless (Authenticate::Configuration[:hash_iterations] && (Authenticate::Configuration[:hash_iterations] > 0))
+        Authenticate::Configuration[:hash_iterations].times { key = Digest::SHA512.hexdigest(key) }
+        key[0..hash_length - 1]
+      end
     end
 
     module InstanceMethods
@@ -63,8 +63,7 @@ module Authenticate
       end
   
       def password?(password)
-        raise Authenticate::MissingPassword unless hashed_password
-        AuthenticatedUser.encrypt(self.salt, password) == self.hashed_password         
+        self.class.encrypt(self.salt, password) == self.hashed_password         
       end
       
       def valid_token?
@@ -122,8 +121,8 @@ module Authenticate
       def encrypt_password
         # This method should only really be called if password is valid, so check for errors to avoid writing garbage.
         if @new_password and !self.errors[:password]
-          write_attribute("salt", AuthenticatedUser.salt)
-          write_attribute("hashed_password", AuthenticatedUser.encrypt(self.salt, @password))
+          write_attribute("salt", self.class.salt)
+          write_attribute("hashed_password", self.class.encrypt(self.salt, @password))
           wipe_password
         end
       end
@@ -138,7 +137,8 @@ module Authenticate
   
       # Generate a new security token valid for hours hours.  The token is Base64 encoded and stripped of newlines for URL and DB safety.
       def new_security_token(hours)
-        token = Digest::SHA512.hexdigest([Array.new(0.75 * TOKEN_LENGTH){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0..TOKEN_LENGTH-1]
+        token_length = User.columns_hash["security_token"].limit
+        token = Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0..token_length - 1]
         write_attribute('security_token', token)
         write_attribute('token_expiry', hours.hours.from_now)
         update_without_callbacks
