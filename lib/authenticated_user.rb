@@ -63,6 +63,7 @@ module Authenticate
       end
   
       def password?(password)
+        raise Authenticate::MissingPassword unless hashed_password
         AuthenticatedUser.encrypt(self.salt, password) == self.hashed_password         
       end
       
