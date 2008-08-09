@@ -1,3 +1,4 @@
+Object.send(:remove_const, :UsersController)
 class UsersController < ActionController::Base
   # See ActionController::RequestForgeryProtection for details
   # Uncomment the :secret if you're not using the cookie session store
