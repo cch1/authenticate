@@ -37,7 +37,7 @@ module Authenticate
       # http://phpsec.org/articles/2005/password-hashing.html
       def salt
         salt_length = self.columns_hash['salt'].limit
-        [Array.new(0.75 * salt_length){rand(256).chr}.join].pack("m").gsub(/\n/, '')[0..salt_length - 1]
+        [Array.new(0.75 * salt_length){rand(256).chr}.join].pack("m").gsub(/\n/, '')[0, salt_length]
       end
       
       # Hash the password and salt iteratively.  The value of iteration has apparently been questioned in the cryptographic 
@@ -48,11 +48,12 @@ module Authenticate
       # http://www.adamberent.com/documents/KeyIterations&CryptoSalts.pdf
       def encrypt(salt, password)
         hash_length = self.columns_hash['hashed_password'].limit
+        iterated_hash_length = Authenticate::Configuration[:compatibility_mode] ? hash_length : 0
         key = salt + password
         # Light up the CPU
         raise "Missing configuration value" unless (Authenticate::Configuration[:hash_iterations] && (Authenticate::Configuration[:hash_iterations] > 0))
-        Authenticate::Configuration[:hash_iterations].times { key = Digest::SHA512.hexdigest(key) }
-        key[0..hash_length - 1]
+        Authenticate::Configuration[:hash_iterations].times { key = Digest::SHA512.hexdigest(key)[0..iterated_hash_length - 1] }
+        key[0, hash_length]
       end
     end
 
@@ -138,7 +139,7 @@ module Authenticate
       # Generate a new security token valid for hours hours.  The token is Base64 encoded and stripped of newlines for URL and DB safety.
       def new_security_token(hours)
         token_length = User.columns_hash["security_token"].limit
-        token = Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0..token_length - 1]
+        token = Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0, token_length]
         write_attribute('security_token', token)
         write_attribute('token_expiry', hours.hours.from_now)
         update_without_callbacks
