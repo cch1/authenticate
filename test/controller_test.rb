@@ -59,6 +59,16 @@ class ControllerTest < ActionController::TestCase
     assert !@controller.send(:logged_in?), "User should not be authenticated."
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
+  
+  test 'should authenticate by token even with conflicting session' do
+    @request.session[:user] = users(:pascale).id
+    users(:chris).generate_security_token
+    get :new, :security_token => users(:chris).security_token
+    assert @controller.send(:logged_in?), "User should be authenticated."
+    assert_equal :token, @controller.instance_variable_get(:@authentication_method)
+    assert_equal :token, @request.session[:authentication_method]   
+    assert_equal users(:chris).id, @request.session[:user]
+  end
 
   test 'should authenticate by session' do
     @request.session[:user] = users(:chris).id

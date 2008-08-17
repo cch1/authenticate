@@ -82,13 +82,13 @@ module Authenticate
     # Identifies the authenticated user, if any.  Override/chain this method to add implicit guest 
     # or other application-specific authentication methods.
     def authenticated_user
-      user_by_session || user_by_authentication_cookie || user_by_http_auth || user_by_token
+      user_by_authentication_cookie || user_by_http_auth || user_by_token || user_by_session
     end
 
-    # Attempt to authenticate with a URL-encoded security token
+    # Attempt to authenticate with a URL-encoded security token.  Remove the token from the parameters if present.
     def user_by_token
-      return unless params[:security_token]
-      if (user = User.authenticate_by_token(params[:security_token]))
+      return unless p = params.delete(:security_token)
+      if (user = User.authenticate_by_token(p))
         @authentication_method = :token
       end
       user
