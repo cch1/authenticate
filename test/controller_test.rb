@@ -1,17 +1,16 @@
 require File.dirname(__FILE__) + '/test_helper.rb'
-require File.dirname(__FILE__) + '/lib/users_controller.rb'
 
 class ControllerTest < ActionController::TestCase
   fixtures :users
   
   tests UsersController
   
-  test 'should start unauthenticated' do
+  def test_should_start_unauthenticated
     assert_nil User.current
     assert_nil @controller.send(:current_user)    
   end
   
-  test 'should login' do
+  def test_should_login
     post :login, :user => {:login => users(:chris).login}
     assert @controller.send(:logged_in?), 'User should be authenticated.'
     assert_equal users(:chris), User.current
@@ -19,7 +18,7 @@ class ControllerTest < ActionController::TestCase
     assert_equal :unknown, @request.session[:authentication_method]
   end
 
-  test 'should logout' do
+  def test_should_logout
     post :login, :user => {:login => users(:chris).login}
     delete :logout
     assert !@controller.send(:logged_in?), 'User should not be authenticated.'
@@ -27,14 +26,14 @@ class ControllerTest < ActionController::TestCase
     assert_nil @controller.send(:current_user)    
   end
 
-  test 'should require authentication by default' do
+  def test_should_require_authentication_by_default
     assert_raises Authenticate::AuthenticationError do
       get :new
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
   end
   
-  test 'should authenticate by valid token' do
+  def test_should_authenticate_by_valid_token
     users(:chris).generate_security_token
     get :new, :security_token => users(:chris).security_token
     assert @controller.send(:logged_in?), "User should be authenticated."
@@ -42,7 +41,7 @@ class ControllerTest < ActionController::TestCase
     assert_equal :token, @request.session[:authentication_method]
   end
 
-  test 'should not authenticate by invalid token' do
+  def test_should_not_authenticate_by_invalid_token
     assert_raises Authenticate::AuthenticationError do
       get :new, :security_token => 'InvalidToken'
     end
@@ -50,7 +49,7 @@ class ControllerTest < ActionController::TestCase
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
-  test 'should not authenticate by expired token' do
+  def test_should_not_authenticate_by_expired_token
     users(:chris).generate_security_token
     users(:chris).update_attribute :token_expiry, 5.minutes.ago
     assert_raises Authenticate::AuthenticationError do
@@ -60,7 +59,7 @@ class ControllerTest < ActionController::TestCase
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
   
-  test 'should authenticate by token even with conflicting session' do
+  def test_should_authenticate_by_token_even_with_conflicting_session
     @request.session[:user] = users(:pascale).id
     users(:chris).generate_security_token
     get :new, :security_token => users(:chris).security_token
@@ -70,7 +69,7 @@ class ControllerTest < ActionController::TestCase
     assert_equal users(:chris).id, @request.session[:user]
   end
 
-  test 'should authenticate by session' do
+  def test_should_authenticate_by_session
     @request.session[:user] = users(:chris).id
     get :new
     assert @controller.send(:logged_in?), "User should be authenticated."
@@ -78,7 +77,7 @@ class ControllerTest < ActionController::TestCase
     assert_equal :session, @request.session[:authentication_method]
   end
 
-  test 'should not authenticate by nil session' do
+  def test_should_not_authenticate_by_nil_session
     @request.session[:user] = nil
     assert_raises Authenticate::AuthenticationError do
       get :new
@@ -87,7 +86,7 @@ class ControllerTest < ActionController::TestCase
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
-  test 'should authenticate by HTTP_AUTHORIZATION' do
+  def test_should_authenticate_by_HTTP_AUTHORIZATION
     @request.env['HTTP_AUTHORIZATION'] = ActionController::HttpAuthentication::Basic.encode_credentials(users(:chris).login, 'Cruft')
     get :new
     assert @controller.send(:logged_in?), "User should be authenticated."
@@ -95,7 +94,7 @@ class ControllerTest < ActionController::TestCase
     assert_equal :http_authentication, @request.session[:authentication_method]
   end
 
-  test 'should not authenticate by invalid HTTP_AUTHORIZATION' do
+  def test_should_not_authenticate_by_invalid_HTTP_AUTHORIZATION
     @request.env['HTTP_AUTHORIZATION'] = ActionController::HttpAuthentication::Basic.encode_credentials(users(:chris).login, 'NotCruft')
     assert_raises Authenticate::AuthenticationError do
       head :new
@@ -104,7 +103,7 @@ class ControllerTest < ActionController::TestCase
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
-  test 'should authenticate by cookie' do
+  def test_should_authenticate_by_cookie
     users(:chris).generate_security_token
     @request.cookies["authentication_token"] = cookie_for(:chris)
     head :new
@@ -113,7 +112,7 @@ class ControllerTest < ActionController::TestCase
     assert_equal :cookie, @request.session[:authentication_method]
   end
 
-  test 'should not authenticate by cookie with invalid token' do
+  def test_should_not_authenticate_by_cookie_with_invalid_token
     users(:chris).generate_security_token
     @request.cookies["authentication_token"] = auth_token('invalid_auth_token')
     assert_raises Authenticate::AuthenticationError do
@@ -123,7 +122,7 @@ class ControllerTest < ActionController::TestCase
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
-  test 'should not authenticate by cookie with expired token' do
+  def test_should_not_authenticate_by_cookie_with_expired_token
     users(:chris).generate_security_token
     users(:chris).update_attribute :token_expiry, 5.minutes.ago
     @request.cookies["authentication_token"] = cookie_for(:chris)
@@ -136,7 +135,7 @@ class ControllerTest < ActionController::TestCase
 
   protected
     # Build a cookie with the given authentication token.
-    def auth_token(token)
+    def auth_token(token) 
       CGI::Cookie.new('name' => 'authentication_token', 'value' => token)
     end
     
