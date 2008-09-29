@@ -3,6 +3,8 @@ require File.dirname(__FILE__) + '/test_helper.rb'
 class ControllerTest < ActionController::TestCase
   fixtures :users
   
+  include Authenticate::AuthenticatedTestHelper
+  
   tests UsersController
   
   def test_should_start_unauthenticated
@@ -10,8 +12,16 @@ class ControllerTest < ActionController::TestCase
     assert_nil @controller.send(:current_user)    
   end
   
+  def test_should_login_manually
+    post :login_simple, :user => {:login => users(:chris).login, :password => 'Cruft'}
+    assert @controller.send(:logged_in?), 'User should be authenticated.'
+    assert_equal users(:chris), User.current
+    assert_equal users(:chris), @controller.send(:current_user)
+    assert_equal :unknown, @request.session[:authentication_method]
+  end
+
   def test_should_login
-    post :login, :user => {:login => users(:chris).login}
+    post :login, :user => {:login => users(:chris).login, :password => 'Cruft'}
     assert @controller.send(:logged_in?), 'User should be authenticated.'
     assert_equal users(:chris), User.current
     assert_equal users(:chris), @controller.send(:current_user)
@@ -19,7 +29,7 @@ class ControllerTest < ActionController::TestCase
   end
 
   def test_should_logout
-    post :login, :user => {:login => users(:chris).login}
+    login_as(:chris)
     delete :logout
     assert !@controller.send(:logged_in?), 'User should not be authenticated.'
     assert_nil User.current
@@ -131,6 +141,36 @@ class ControllerTest < ActionController::TestCase
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
     assert_nil @controller.instance_variable_get(:@authentication_method)
+  end
+  
+  uses_mocha 'mocking OpenID library' do
+    def test_should_begin_authentication_by_OpenID
+      identity_url = 'http://openid-provider.appspot.com/corlett.chris/'
+      request = mock do
+        stubs(:return_to_args).returns(Hash.new)
+        expects(:redirect_url).returns("http://somewhere.com/?openid.identity=#{identity_url}")
+      end
+      ::OpenID::Consumer.any_instance.expects(:begin).returns(request)
+  
+      post :login, :credentials => {:login => identity_url}
+      assert !@controller.send(:logged_in?), "User should not be authenticated."
+      assert_response :redirect
+      assert_match /#{identity_url}/, @response.redirected_to
+    end  
+
+    def test_should_complete_authentication_by_OpenID
+      identity_url = users(:chris).identity_url
+      response = mock do
+        stubs(:status).returns(::OpenID::Consumer::SUCCESS)
+        stubs(:identity_url).returns(identity_url)
+      end
+      ::OpenID::Consumer.any_instance.expects(:complete).returns(response)
+      
+      params = {"open_id_complete"=>"1", "openid.sig"=>"TZK7lEXXMBME5opcsUqCd3s2BB4=", "openid.return_to"=>"http://test.com/home?open_id_complete=1&openid1_claimed_id=http%3A%2F%2Fchris.myopenid.com%2F&rp_nonce=2008-09-26T19%3A39%3A16ZTMgPw9", "openid.mode"=>"id_res", "openid.op_endpoint"=>"http://www.myopenid.com/server", "rp_nonce"=>"2008-09-26T19:39:16ZTMgPw9", "openid.response_nonce"=>"2008-09-26T19:39:17Z0fqKSy", "openid.identity"=>"http://chris.myopenid.com/", "openid1_claimed_id"=>"http://chris.myopenid.com/", "openid.signed"=>"assoc_handle,identity,mode,op_endpoint,response_nonce,return_to,signed", "openid.assoc_handle"=>"{HMAC-SHA1}{48da926b}{VLBz+Q==}"}
+      get :home, params
+      assert @controller.send(:logged_in?), "User should be authenticated."
+      assert_response :success
+    end
   end
 
   protected
