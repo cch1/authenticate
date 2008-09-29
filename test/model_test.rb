@@ -98,4 +98,10 @@ class ModelTest < ActiveSupport::TestCase
     assert u.save
     assert u.password?('')
   end
+  
+  # The OpenID identity URL should be normalized on assignment.
+  def test_should_set_identity_url
+    assert users(:pascale).identity_url = 'http://pascale.oid.com'
+    assert_equal 'http://pascale.oid.com/', users(:pascale).identity_url
+  end
 end

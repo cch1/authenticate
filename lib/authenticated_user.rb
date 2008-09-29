@@ -114,6 +114,12 @@ module Authenticate
         @new_password = true
       end
       
+      # Normalize the OpenID identity URL on assignment
+      def identity_url=(u)
+        u = OpenID.normalize_url(u) if defined?(OpenID)
+        write_attribute('identity_url', u)
+      end
+      
       protected  
       def validate_password?
         @new_password
