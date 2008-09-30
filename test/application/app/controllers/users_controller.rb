@@ -18,8 +18,7 @@ class UsersController < ActionController::Base
   end
   
   def login
-    authenticate do |user, method|
-      self.current_user = user
+    authenticate do |user|
       render :text => 'logged in'
     end
   end

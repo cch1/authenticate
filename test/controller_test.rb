@@ -21,7 +21,7 @@ class ControllerTest < ActionController::TestCase
   end
 
   def test_should_login
-    post :login, :user => {:login => users(:chris).login, :password => 'Cruft'}
+    post :login, :credentials => {:login => users(:chris).login, :password => 'Cruft'}
     assert @controller.send(:logged_in?), 'User should be authenticated.'
     assert_equal users(:chris), User.current
     assert_equal users(:chris), @controller.send(:current_user)
@@ -141,6 +141,15 @@ class ControllerTest < ActionController::TestCase
     end
     assert !@controller.send(:logged_in?), "User should not be authenticated."
     assert_nil @controller.instance_variable_get(:@authentication_method)
+  end
+  
+  def test_should_generate_remember_me_cookie_upon_authentication
+    post :login, :credentials => {:login => users(:chris).login, :password => 'Cruft'}, :remember_me => '1'
+    # Note that that cookies method below is not the same as the one used in ActionController -it is specific to the
+    # test process and always returns an array of values, even if the value is a singleton.  Neither the reader nor the 
+    # writer in ActionController behave this way.
+    assert token = cookies["authentication_token"].first
+    assert_equal users(:chris), User.authenticate_by_token(token)
   end
   
   uses_mocha 'mocking OpenID library' do
