@@ -17,7 +17,7 @@ module Authenticate
       else # remove persistence
         cookies.delete :authentication_token
         session[:authentication_method] = nil
-        logger.info "Authentication: User #{@current_user} logged out."
+        logger.info "Authentication: User #{@current_user.login} logged out." if @current_user
       end
       @current_user = u
       session[:user] = u && u.id
@@ -32,7 +32,7 @@ module Authenticate
     def authentication
       returning self.authenticated_user do |u|
         self.current_user = u # this is the login
-        access_denied unless u
+        handle_authentication_failure unless u
       end
     end
 
