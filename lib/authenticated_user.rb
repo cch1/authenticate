@@ -30,7 +30,7 @@ module Authenticate
         sleep(Authenticate::Configuration[:authentication_delay].to_f)
         u = self.find_by_security_token(token)
         u && u.valid_token? ? u : nil
-      end      
+      end
       
       # Generate a random Base64-encoded salt string to prevent pre-calculated dictionary attacks and collisions.  Newlines are
       # removed from the string to ensure DB compatibility (SQLite!).
@@ -72,34 +72,36 @@ module Authenticate
       end
       
       def token_expired?
-        raise Authenticate::InvalidTokenExpiry unless self.token_expiry.is_a?(Time)
-        Time.now > self.token_expiry
+        raise Authenticate::InvalidTokenExpiry unless token_expiry.is_a?(Time)
+        Time.now > token_expiry
       end
   
-      def bump_token_expiry(h = nil)
-        write_attribute('token_expiry', h || Authenticate::Configuration[:security_token_life].hours.from_now)
-        update_without_callbacks
+      def bump_token_expiry(h = 24)
+        raise "Can't bump token expiration when token has not been set." unless security_token
+        returning (h || Authenticate::Configuration[:security_token_life]).hours.from_now do |t|
+          self.token_expiry = t
+          update_without_callbacks
+        end
       end
-  
+
       def valid_password?
-        hashed_password && !(hashed_password.length == 0)
+        hashed_password && !hashed_password.empty?
       end
-      
+
       def generate_security_token(hours = Authenticate::Configuration[:security_token_life])
-          new_security_token(hours)
+        new_security_token(hours)
       end
       alias :security_token! :generate_security_token
-  
+
       def set_delete_after
         h = Authenticate::Configuration[:delete_delay] * 24
         write_attribute('deleted', true)
         write_attribute('delete_after', h.hours.from_now)
-  
         # Generate and return a token here, so that it expires at
         # the same time that the account deletion takes effect.
         return generate_security_token(h)
       end
-  
+
       # Change the user's password to the given password.  As a convenience, the password_confirmation
       # virtual attribute is also set to support validations.
       # TODO: DEPRECATED 
@@ -107,19 +109,19 @@ module Authenticate
         self.password = pw
         @password_confirmation = confirm
       end
-      
+
       # Change the user's password to the given password and trigger encryption to occur on validation.
       def password=(pw)
         @password = pw
         @new_password = true
       end
-      
+
       # Normalize the OpenID identity URL on assignment
       def identity_url=(u)
         u = OpenID.normalize_url(u) if defined?(OpenID)
         write_attribute('identity_url', u)
       end
-      
+
       protected  
       def validate_password?
         @new_password
@@ -133,7 +135,7 @@ module Authenticate
           wipe_password
         end
       end
-  
+
       # Attempt to expunge passwords from memory and reset encryption-required flag.
       def wipe_password
         @new_password = false
@@ -141,15 +143,15 @@ module Authenticate
         @password_confirmation = @password
         true
       end
-  
+
       # Generate a new security token valid for hours hours.  The token is Base64 encoded and stripped of newlines for URL and DB safety.
       def new_security_token(hours)
         token_length = User.columns_hash["security_token"].limit
-        token = Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0, token_length]
-        write_attribute('security_token', token)
-        write_attribute('token_expiry', hours.hours.from_now)
-        update_without_callbacks
-        return self.security_token
+        returning Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0, token_length] do |token|
+          write_attribute('security_token', token)
+          write_attribute('token_expiry', hours.hours.from_now)
+          update_without_callbacks
+        end
       end
     end # module
   end # module

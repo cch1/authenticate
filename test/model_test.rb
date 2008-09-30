@@ -104,4 +104,9 @@ class ModelTest < ActiveSupport::TestCase
     assert users(:pascale).identity_url = 'http://pascale.oid.com'
     assert_equal 'http://pascale.oid.com/', users(:pascale).identity_url
   end
+  
+  def test_should_bump_token_expiry
+    assert_kind_of Time, users(:pascale).bump_token_expiry
+    assert_operator Time.now, '<', users(:pascale).token_expiry
+  end
 end
