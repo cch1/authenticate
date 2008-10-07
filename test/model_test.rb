@@ -19,8 +19,8 @@ class ModelTest < ActiveSupport::TestCase
   
   def test_should_generate_valid_token
     u = users(:pascale)
-    token = u.security_token!
-    assert_equal u, User.authenticate_by_token(u.security_token)
+    t = u.security_token!
+    assert_equal u, User.authenticate_by_token(t)
   end
 
   def test_should_not_authenticate_with_invalid_token
@@ -77,24 +77,22 @@ class ModelTest < ActiveSupport::TestCase
   # Test the ability to create a user and set the password in one step.
   def test_should_create_user_with_password
     u = User.new({:login => 'newUser', :password => "x"})
-    assert u.new_password
     assert u.save
     assert u.password?('x')
   end
   
   # Test nil passwords.  To disable nil passwords, use a database restriction
-  # or a custom validation that examines the @password virtual attribute.
+  # or a custom validation that examines the password virtual attribute.
   def test_should_create_user_with_nil_password
     u = User.new({:login => 'newUser'})
-    assert !u.new_password
-    assert u.save  
+    assert u.save
+    assert u.password?(nil)
   end
 
   # Test blank passwords.  To disable blank passwords use
   # validates_presence_of :password, :if => :validate_password?
   def test_should_create_user_with_blank_password
     u = User.new({:login => 'newUser', :password => ''})
-    assert u.new_password
     assert u.save
     assert u.password?('')
   end
@@ -108,5 +106,28 @@ class ModelTest < ActiveSupport::TestCase
   def test_should_bump_token_expiry
     assert_kind_of Time, users(:pascale).bump_token_expiry
     assert_operator Time.now, '<', users(:pascale).token_expiry
+  end
+  
+  # Obfuscate the cleartext password as soon as possible with values that "look" right in HTML forms.
+  def test_should_replace_cleartext_password_after_validation
+    pw = 'newPassword'
+    u = User.new({:login => 'newUser', :password => pw, :password_confirmation => pw})
+    assert u.valid?
+    assert_equal pw.length, u.send(:password).length
+    assert_not_equal pw, u.send(:password)
+    assert_equal pw.length, u.send(:password_confirmation).length
+    assert_not_equal pw, u.send(:password_confirmation)
+    assert u.password?(pw)
+  end
+
+  # Setting the password to the current value of the virtual attribute (including the mask) should not
+  # cause the encrypted password to change.
+  def test_should_not_encrypt_mask
+    pw = 'aPassword'
+    u = User.new({:login => 'newUser', :password => pw, :password_confirmation => pw})
+    assert u.valid?
+    u.password = u.send(:password)
+    assert u.password?(pw)
+    assert_equal :masked, u.instance_variable_get(:@pw_state)
   end
 end

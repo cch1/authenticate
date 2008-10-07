@@ -6,15 +6,18 @@ module Authenticate
         extend SingletonMethods
         include InstanceMethods
   
-        attr_accessor :new_password
-
         validates_presence_of :login
         validates_uniqueness_of :login
-        validates_confirmation_of :password, :if => :validate_password?
+        validates_confirmation_of :password
+
+        # Masking of the cleartext password happens during encryption. Encryption is configured to happen
+        # after_validation -thus balancing security risks with the need to validate the cleartext password
+        # Beware you do not expose the cleartext password in an unencrypted client-side session store or HTML form.
+        after_validation :encrypt_password
 
         protected 
         attr_reader :password
-        after_validation :encrypt_password
+        attr_accessor :pw_state
       end
     end
 
@@ -47,6 +50,7 @@ module Authenticate
       # http://macshadows.com/kb/index.php?title=Mac_OS_X_password_hashes
       # http://www.adamberent.com/documents/KeyIterations&CryptoSalts.pdf
       def encrypt(salt, password)
+        return password unless password && salt
         hash_length = self.columns_hash['hashed_password'].limit
         iterated_hash_length = Authenticate::Configuration[:compatibility_mode] ? hash_length : 0
         key = salt + password
@@ -58,11 +62,6 @@ module Authenticate
     end
 
     module InstanceMethods
-      def initialize(*args)
-        super
-        @new_password = !@password.nil?
-      end
-  
       def password?(password)
         self.class.encrypt(self.salt, password) == self.hashed_password         
       end
@@ -84,15 +83,12 @@ module Authenticate
         end
       end
 
-      def valid_password?
-        hashed_password && !hashed_password.empty?
-      end
-
       def generate_security_token(hours = Authenticate::Configuration[:security_token_life])
         new_security_token(hours)
       end
       alias :security_token! :generate_security_token
 
+      # TODO: Deprecated -nothing to do with authentication.
       def set_delete_after
         h = Authenticate::Configuration[:delete_delay] * 24
         write_attribute('deleted', true)
@@ -107,49 +103,63 @@ module Authenticate
       # TODO: DEPRECATED 
       def change_password(pw, confirm = pw)
         self.password = pw
-        @password_confirmation = confirm
+        self.password_confirmation = confirm
       end
 
       # Change the user's password to the given password and trigger encryption to occur on validation.
+      # NB: Setting the password to the mask value after intially setting it to any other value will result
+      # in the second password not being saved.
+      # TODO: Trap setting the password to the mask value.
       def password=(pw)
-        @password = pw
-        @new_password = true
+        return pw if pw == @password  # Don't reset encryption
+        returning @password = pw do |p|
+          self.pw_state = :cleartext
+          self.salt = nil
+          self.hashed_password = nil
+        end
       end
-
+      
       # Normalize the OpenID identity URL on assignment
       def identity_url=(u)
         u = OpenID.normalize_url(u) if defined?(OpenID)
-        write_attribute('identity_url', u)
+        write_attribute(:identity_url, u)
       end
 
-      protected  
+      protected
+      # The password (and password_confirmation) virtual attributes can only be validated when they hold
+      # cleartext.  If they have been masked, validations are not appropriate.  If they are not set (as
+      # would be the case on a rehydrated record) then they should not be validated either.
       def validate_password?
-        @new_password
+        pw_state == :cleartext
       end
 
+      # Encrypt the cleartext password and store encrypted version in database-backed attributes, then mask
+      # the cleartext version of the password. If an encrypted version is already present skip the encryption.
+      # It is assumed that this method is only invoked when the password is valid (as would be the case in a
+      # before_save macro).
       def encrypt_password
-        # This method should only really be called if password is valid, so check for errors to avoid writing garbage.
-        if @new_password and !self.errors[:password]
-          write_attribute("salt", self.class.salt)
-          write_attribute("hashed_password", self.class.encrypt(self.salt, @password))
-          wipe_password
-        end
+        return unless pw_state == :cleartext
+        raise AuthenticationError, "Can't overwrite existing encrypted password." unless hashed_password.nil?
+        self.salt = self.class.salt
+        self.hashed_password = self.class.encrypt(self.salt, password)
+        mask_password
       end
 
-      # Attempt to expunge passwords from memory and reset encryption-required flag.
-      def wipe_password
-        @new_password = false
-        @password = nil
-        @password_confirmation = @password
-        true
+      # Expunge cleartext passwords from memory after encrypted version has been created.
+      # Instead of removing the password altogether, we replace it with a mask value of the
+      # same length to better support HTML forms.
+      def mask_password
+        @password = "*" * password.length if password
+        @password_confirmation = "*" * password_confirmation.length if password_confirmation
+        self.pw_state = :masked
       end
 
       # Generate a new security token valid for hours hours.  The token is Base64 encoded and stripped of newlines for URL and DB safety.
       def new_security_token(hours)
         token_length = User.columns_hash["security_token"].limit
         returning Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0, token_length] do |token|
-          write_attribute('security_token', token)
-          write_attribute('token_expiry', hours.hours.from_now)
+          self.security_token = token
+          self.token_expiry = hours.hours.from_now
           update_without_callbacks
         end
       end
