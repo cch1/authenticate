@@ -121,7 +121,7 @@ module Authenticate
       
       # Normalize the OpenID identity URL on assignment
       def identity_url=(u)
-        u = OpenID.normalize_url(u) if defined?(OpenID)
+        u = OpenID.normalize_url(u) if defined?(OpenID) rescue u # Not pretty, but OpenID raises too many exceptions.
         write_attribute(:identity_url, u)
       end
 
