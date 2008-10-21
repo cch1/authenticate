@@ -25,7 +25,13 @@ class ControllerTest < ActionController::TestCase
     assert @controller.send(:logged_in?), 'User should be authenticated.'
     assert_equal users(:chris), User.current
     assert_equal users(:chris), @controller.send(:current_user)
-    assert_equal :unknown, @request.session[:authentication_method]
+    assert_equal :post, @request.session[:authentication_method]
+  end
+
+  def test_should_remember_me
+    post :login, :credentials => {:login => users(:chris).login, :password => 'Cruft'}, :remember_me => '1'
+    assert users(:chris).reload.security_token
+    assert_equal users(:chris).reload.security_token, cookies["authentication_token"].first
   end
 
   def test_should_logout

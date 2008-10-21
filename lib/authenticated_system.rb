@@ -13,15 +13,23 @@ module Authenticate
         # Could regenerate token instead for nonce behavior
         cookies[:authentication_token] = { :value => u.security_token , :expires => u.bump_token_expiry } if cookies[:authentication_token] 
         session[:authentication_method] ||= (@authentication_method || :unknown) # Record authentication method used at login.
-        logger.info "Authentication: User #{u.login} logged in via #{session[:authentication_method]} and authenticated via #{@authentication_method}."
+        logger.info "Authentication: User #{u.login} logged in via #{authentication_method}." unless session[:user] == u.id
+        logger.debug "Authentication: User #{u.login} authenticated via #{@authentication_method}."
       else # remove persistence
         cookies.delete :authentication_token
         session[:authentication_method] = nil
-        logger.info "Authentication: User #{@current_user.login} logged out." if @current_user
+        logger.info "Authentication: User #{current_user.login} logged out." if current_user
       end
       @current_user = u
       session[:user] = u && u.id
       User.current = u # This is a nasty coupling that should be eliminated...
+    end
+    
+    # Returns the method used to authenticate the current user
+    def authentication_method
+      returning @authentication_method do |m|
+        logger.warn "Authentication: Unknown authentication method." unless m        
+      end
     end
     
     # Checks for an authenticated user, implicitly logging him in if present.
@@ -68,6 +76,7 @@ module Authenticate
           redirect_to(oid_url) and return
         else
           if u = User.authenticate(credentials[:login], credentials[:password])
+            @authentication_method = :post
             self.current_user = u # login
             cookies[:authentication_token] = { :value => u.generate_security_token, :expires => u.token_expiry } if options[:remember_me]
             yield u if block_given?
@@ -89,8 +98,11 @@ module Authenticate
     
     # Identifies the authenticated user, if any.  Override/chain this method to add implicit guest 
     # or other application-specific authentication methods.
+    # Ordering is very important for semantics as multiple authentication methods are sometimes active on a given request.
+    # Rule 1: auth_cookie and session both (normally) rely on cookies, but auth_cookies are intended to provide long-term auth, not request-to-request
+    #         auth.  So we should have session before cookie.
     def authenticated_user
-      user_by_authentication_cookie || user_by_http_auth || user_by_token || user_by_session || user_by_openid
+      user_by_http_auth || user_by_token || user_by_session || user_by_authentication_cookie || user_by_openid
     end
 
     # Attempt to authenticate with a URL-encoded security token.  Remove the token from the parameters if present.
