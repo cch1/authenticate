@@ -67,7 +67,7 @@ module Authenticate
       options = args.last.is_a?(::Hash) ? args.pop : params
       credentials = args.first || params[:credentials]
       case
-        when id = identity_url(credentials)
+        when id = extract_openid_identity(credentials)
           return_to    = options[:return_to] || root_url
           realm        = options[:realm] || root_url # Identifies this site to the user at the OpenID provider's pages.
           open_id_request = OpenID::Consumer.new(session, open_id_store).begin(id)
@@ -88,7 +88,7 @@ module Authenticate
     private :authenticate
     
     # Extract an OpenID identity URL from the credentials, if present.
-    def identity_url(credentials)
+    def extract_openid_identity(credentials)
       credentials[:login] && credentials[:login].slice(/http:\/\/.*/) || credentials[:openid_identifier] || credentials[:openid_url]
     end
     
