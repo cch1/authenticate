@@ -12,9 +12,9 @@ module Authenticate
       if u
         # Could regenerate token instead for nonce behavior
         cookies[:authentication_token] = { :value => u.security_token , :expires => u.bump_token_expiry } if cookies[:authentication_token] 
-        session[:authentication_method] ||= (@authentication_method || :unknown) # Record authentication method used at login.
+        session[:authentication_method] ||= (authentication_method || :unknown) # Record authentication method used at login.
         logger.info "Authentication: User #{u.login} logged in via #{authentication_method}." unless session[:user] == u.id
-        logger.debug "Authentication: User #{u.login} authenticated via #{@authentication_method}."
+        logger.debug "Authentication: User #{u.login} authenticated via #{authentication_method}."
       else # remove persistence
         cookies.delete :authentication_token
         session[:authentication_method] = nil
