@@ -44,6 +44,23 @@ class ModelTest < ActiveSupport::TestCase
     assert_nil User.authenticate(u.login, "Rennes") # is the old one invalid?
   end
   
+  def test_should_track_password_state
+    u = users(:pascale)
+    assert !u.send(:validate_password?)
+    u.password = "Marseille"
+    assert u.send(:validate_password?)
+    assert u.save
+    assert !u.send(:validate_password?)
+  end
+  
+  def test_should_track_password_state_with_assigned_nil_password
+    u = users(:pascale)
+    u.password = nil
+    assert u.send(:validate_password?)
+    assert u.save
+    assert !u.send(:validate_password?)
+  end
+  
   def test_should_not_change_password_with_bad_confirmation_with_old_API
     users(:pascale).change_password("anewpassword", "bnewpassword")
     assert !users(:pascale).save

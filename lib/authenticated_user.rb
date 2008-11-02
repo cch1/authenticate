@@ -109,9 +109,8 @@ module Authenticate
       # Change the user's password to the given password and trigger encryption to occur on validation.
       # NB: Setting the password to the mask value after intially setting it to any other value will result
       # in the second password not being saved.
-      # TODO: Trap setting the password to the mask value.
       def password=(pw)
-        return pw if pw == @password  # Don't reset encryption
+        return pw if pw == @password && pw_state == :masked # Don't foul up encryped version
         returning @password = pw do |p|
           self.pw_state = :cleartext
           self.salt = nil
