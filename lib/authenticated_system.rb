@@ -107,8 +107,8 @@ module Authenticate
 
     # Attempt to authenticate with a URL-encoded security token.  Remove the token from the parameters if present.
     def user_by_token
-      return unless p = params.delete(:security_token)
-      returning User.authenticate_by_token(p) do |u|
+      return unless params && params[:security_token]
+      returning User.authenticate_by_token(params[:security_token]) do |u|
         @authentication_method = :token if u
       end
     end
@@ -130,7 +130,7 @@ module Authenticate
   
     # Attempt to authenticate with session data.
     def user_by_session
-      return unless session[:user]
+      return unless session && session[:user]
       returning User.find(session[:user]) do |u|
         @authentication_method = :session if u # This should never be an *initial* authentication method.        
       end
@@ -138,7 +138,7 @@ module Authenticate
     
     # Attempt to authenticate with an OpenID callback.
     def user_by_openid
-      return unless params[:open_id_complete] # If this parameter is present, let's assume OpenID gem is installed.
+      return unless params && params[:open_id_complete] # If this parameter is present, let's assume OpenID gem is installed.
       # We can't use params because it include Rails' psuedo-parameters.  And bugs in Rails' handling of path parameters
       # keys means we can't use handy methods on the request object.  So we resort to processing the params hash.
       original_parameters = params.reject { |key, value| request.path_parameters[key] }
