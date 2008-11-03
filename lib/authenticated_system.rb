@@ -2,48 +2,48 @@ module Authenticate
   module AuthenticatedSystem
     
     protected
-    # Returns the current user.  No implicit logging in occurs.
-    attr_reader :current_user
-    alias logged_in? current_user
-    
-    # Assigns the current_user, effectively performing login and logout operations.
-    # TODO: Should work even if sessions are disabled.
+
+    attr_reader :authentication_method
+
+    # Assign the current user manually and persist his authentication.
     def current_user=(u)
+      @authentication_method ||= :manual
+      @authenticated_user = u
+      persist_authentication(u)
+    end
+    
+    # Persist the given user's authentication across requests.
+    # Semantically, this could be interpreted as "login" or "logout" operation.
+    # TODO: Test behavior with sessions and cookies disabled.
+    def persist_authentication(u)
+      raise "Unknown authentication method." unless authentication_method
       if u
         # Could regenerate token instead for nonce behavior
         cookies[:authentication_token] = { :value => u.security_token , :expires => u.bump_token_expiry } if cookies[:authentication_token] 
-        session[:authentication_method] ||= (authentication_method || :unknown) # Record authentication method used at login.
-        logger.info "Authentication: User #{u.login} logged in via #{authentication_method}." unless session[:user] == u.id
-        logger.debug "Authentication: User #{u.login} authenticated via #{authentication_method}."
+        session[:authentication_method] ||= authentication_method  # Record authentication method used at login.
+        logger.info "Authentication: #{u.login} logged in via #{authentication_method}." unless session[:user] == u.id
       else # remove persistence
         cookies.delete :authentication_token
         session[:authentication_method] = nil
-        logger.info "Authentication: User #{current_user.login} logged out." if current_user
+        logger.info "Authentication: User logged out (#{session[:user]})."
       end
-      @current_user = u
       session[:user] = u && u.id
-      User.current = u # This is a nasty coupling that should be eliminated...
     end
-    
-    # Returns the method used to authenticate the current user
-    def authentication_method
-      returning @authentication_method do |m|
-        logger.warn "Authentication: Unknown authentication method." unless m        
-      end
+
+    # Logged in is the state in which the current user is persisted.  Note that Rails (through 2.2) does not
+    # not allow the reading of written/outbound cookies.  Thus persistence is determined solely from the session.
+    def logged_in?
+      !session[:user].nil?
     end
     
     # Checks for an authenticated user, implicitly logging him in if present.
-    # Authentication Filter.  Usage:
-    #   prepend_before_filter :authentication, :only => [:actionx, :actiony]
-    #   skip_before_filter :authentication, :only => [:actionx]
-    # TODO: This should be an around filter, and authentication state should be cleared everywhere but the session after each request.
     def authentication
-      returning self.authenticated_user do |u|
-        self.current_user = u # this is the login
-        handle_authentication_failure unless u
+      returning authenticated_user do |u|
+        u ? logger.debug("Authentication: #{u.login} authenticated via #{authentication_method}.") : handle_authentication_failure
+        persist_authentication(u)
       end
     end
-
+    
     # Manage response to authentication failure.  Override this method in application.rb.
     def handle_authentication_failure(message = nil)
       raise Authenticate::AuthenticationError, message
@@ -59,9 +59,9 @@ module Authenticate
     end
     
     # Authenticate the user based on provided credentials.  Credentials object can include userid, password and OpenID URLs.
-    # When the user is authenticated, the associated block is executed.  This is a high-level construct, and as such it takes care 
-    # of login, logging, session storage for authentication on subsequent requests, and even setting the authentication cookie.  But
-    # it also depends on specific named parameters, such as the credentials parameters and the remember_me 
+    # When the user is authenticated, the associated block is executed.  This is a high-level construct, and it takes care 
+    # of login (logging and persistence).  If no parameters are provided, it attempts to extract authentication information
+    # from the current request.
     # TODO: The callback from the provider will be an HTTP GET.  To add support for POST, see OpenID::Consumer::CheckIDRequest#send_redirect? 
     def authenticate(*args, &block)
       options = args.last.is_a?(::Hash) ? args.pop : params
@@ -104,6 +104,8 @@ module Authenticate
     def authenticated_user
       @authenticated_user ||= user_by_http_auth || user_by_token || user_by_session || user_by_authentication_cookie || user_by_openid
     end
+    alias authenticated? authenticated_user
+    alias current_user authenticated_user
 
     # Attempt to authenticate with a URL-encoded security token.  Remove the token from the parameters if present.
     def user_by_token

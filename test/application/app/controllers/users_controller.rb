@@ -1,6 +1,6 @@
 class UsersController < ActionController::Base
   prepend_before_filter :authentication
-  skip_before_filter(:authentication, :only => ['login', 'login_simple'])
+  skip_before_filter(:authentication, :only => ['login', 'login_simple', :status])
   
   def new
     render :text => "new action"
@@ -25,5 +25,9 @@ class UsersController < ActionController::Base
   
   def home
     render :text => 'home'
+  end
+  
+  def status
+    render :text => 'status'
   end
 end

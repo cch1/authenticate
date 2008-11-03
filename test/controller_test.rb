@@ -8,22 +8,27 @@ class ControllerTest < ActionController::TestCase
   tests UsersController
   
   def test_should_start_unauthenticated
-    assert_nil User.current
-    assert_nil @controller.send(:current_user)    
+    assert_nil @controller.send(:current_user)
+    assert_nil @controller.send(:authentication_method)
+  end
+  
+  # Regardless of the presence/absence of a filter, it should be possible to authenticate.
+  def test_should_authenticate_implicitly
+    users(:chris).generate_security_token
+    get :status, :security_token => users(:chris).security_token
+    assert @controller.send(:current_user)
   end
   
   def test_should_login_manually
     post :login_simple, :user => {:login => users(:chris).login, :password => 'Cruft'}
     assert @controller.send(:logged_in?), 'User should be authenticated.'
-    assert_equal users(:chris), User.current
     assert_equal users(:chris), @controller.send(:current_user)
-    assert_equal :unknown, @request.session[:authentication_method]
+    assert_equal :manual, @request.session[:authentication_method]
   end
 
   def test_should_login
     post :login, :credentials => {:login => users(:chris).login, :password => 'Cruft'}
     assert @controller.send(:logged_in?), 'User should be authenticated.'
-    assert_equal users(:chris), User.current
     assert_equal users(:chris), @controller.send(:current_user)
     assert_equal :post, @request.session[:authentication_method]
   end
@@ -38,8 +43,6 @@ class ControllerTest < ActionController::TestCase
     login_as(:chris)
     delete :logout
     assert !@controller.send(:logged_in?), 'User should not be authenticated.'
-    assert_nil User.current
-    assert_nil @controller.send(:current_user)    
   end
 
   def test_should_require_authentication_by_default
