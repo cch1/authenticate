@@ -102,7 +102,7 @@ module Authenticate
     # Rule 1: auth_cookie and session both (normally) rely on cookies, but auth_cookies are intended to provide long-term auth, not request-to-request
     #         auth.  So we should have session before cookie.
     def authenticated_user
-      @authenticated_user ||= user_by_http_auth || user_by_token || user_by_session || user_by_authentication_cookie || user_by_openid
+      @authenticated_user ||= user_by_http_auth || user_by_token || user_by_session || user_by_authentication_cookie || user_by_openid rescue nil
     end
     alias authenticated? authenticated_user
     alias current_user authenticated_user

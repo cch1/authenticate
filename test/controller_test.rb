@@ -16,7 +16,7 @@ class ControllerTest < ActionController::TestCase
   def test_should_authenticate_implicitly
     users(:chris).generate_security_token
     get :status, :security_token => users(:chris).security_token
-    assert @controller.send(:current_user)
+    assert users(:chris), @controller.send(:current_user)
   end
   
   def test_should_login_manually
@@ -161,6 +161,17 @@ class ControllerTest < ActionController::TestCase
     assert_equal users(:chris), User.authenticate_by_token(token)
   end
   
+  # Even when fed garbage, the authentication process should trap exceptions
+  # to ensure that an infinite redirection loop is not spawned.
+  def test_should_trap_exceptions_during_authentication
+    @request.session[:user] = -1
+    assert_nothing_raised do
+      get :status
+    end
+    assert !@controller.send(:authenticated?), "User should not be authenticated."
+    assert_nil @controller.instance_variable_get(:@authentication_method)
+  end
+
   uses_mocha 'mocking OpenID library' do
     def test_should_begin_authentication_by_OpenID
       identity_url = 'http://openid-provider.appspot.com/corlett.chris/'

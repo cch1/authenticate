@@ -28,6 +28,7 @@ class UsersController < ActionController::Base
   end
   
   def status
+    authenticated? ? "yes" : "no"
     render :text => 'status'
   end
 end
