@@ -65,7 +65,7 @@ module Authenticate
     # TODO: The callback from the provider will be an HTTP GET.  To add support for POST, see OpenID::Consumer::CheckIDRequest#send_redirect? 
     def authenticate(*args, &block)
       options = args.last.is_a?(::Hash) ? args.pop : params
-      credentials = args.first || params[:credentials]
+      credentials = args.first || params[:credentials] || {}
       case
         when id = extract_openid_identity(credentials)
           return_to    = options[:return_to] || root_url
