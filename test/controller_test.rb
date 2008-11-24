@@ -30,7 +30,7 @@ class ControllerTest < ActionController::TestCase
     post :login, :credentials => {:login => users(:chris).login, :password => 'Cruft'}
     assert @controller.send(:logged_in?), 'User should be authenticated.'
     assert_equal users(:chris), @controller.send(:current_user)
-    assert_equal :post, @request.session[:authentication_method]
+    assert_equal :http_post, @request.session[:authentication_method]
   end
 
   def test_should_remember_me
