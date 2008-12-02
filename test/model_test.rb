@@ -128,8 +128,13 @@ class ModelTest < ActiveSupport::TestCase
   end
   
   def test_should_bump_token_expiry
+    assert_kind_of Time, users(:pascale).bump_token_expiry(96)
+    assert_in_delta 96.hours.from_now, users(:pascale).token_expiry, 1
+  end
+  
+  def test_should_bump_token_expiry_by_configured_default
     assert_kind_of Time, users(:pascale).bump_token_expiry
-    assert_operator Time.now, '<', users(:pascale).token_expiry
+    assert_in_delta Authenticate::Configuration[:security_token_life].hours.from_now, users(:pascale).token_expiry, 1
   end
   
   # Obfuscate the cleartext password as soon as possible with values that "look" right in HTML forms.

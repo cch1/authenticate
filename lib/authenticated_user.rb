@@ -75,9 +75,9 @@ module Authenticate
         Time.now > token_expiry
       end
   
-      def bump_token_expiry(h = 24)
+      def bump_token_expiry(h = Authenticate::Configuration[:security_token_life])
         raise "Can't bump token expiration when token has not been set." unless security_token
-        returning (h || Authenticate::Configuration[:security_token_life]).hours.from_now do |t|
+        returning h.hours.from_now do |t|
           self.token_expiry = t
           update_without_callbacks
         end
