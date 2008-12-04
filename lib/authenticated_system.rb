@@ -31,9 +31,11 @@ module Authenticate
     end
 
     # Logged in is the state in which the current user is persisted.  Note that Rails (through 2.2) does not
-    # not allow the reading of written/outbound cookies.  Thus persistence is determined solely from the session.
+    # (practically) allow the reading of written/outbound cookies, making it difficult to rigorously determine
+    # our intent to persist authentication through to the next request.  Instead, we assume that authentication
+    # with an inherently persistent method will endure and thus that any auth cookie will not expire.
     def logged_in?
-      !session[:user].nil?
+      !session[:user].nil? || authenticated? && [:session, :cookie].include?(authentication_method)
     end
     
     # Checks for an authenticated user, implicitly logging him in if present.

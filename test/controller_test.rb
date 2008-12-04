@@ -8,7 +8,7 @@ class ControllerTest < ActionController::TestCase
   tests UsersController
   
   def test_should_start_unauthenticated
-    assert_nil @controller.send(:current_user)
+    assert_nil @controller.send(:authenticated?)
     assert_nil @controller.send(:authentication_method)
   end
   
@@ -16,19 +16,19 @@ class ControllerTest < ActionController::TestCase
   def test_should_authenticate_implicitly
     users(:chris).generate_security_token
     get :status, :security_token => users(:chris).security_token
-    assert users(:chris), @controller.send(:current_user)
+    assert users(:chris), @controller.send(:authenticated?)
   end
   
   def test_should_login_manually
     post :login_simple, :user => {:login => users(:chris).login, :password => 'Cruft'}
-    assert @controller.send(:logged_in?), 'User should be authenticated.'
+    assert @controller.send(:logged_in?), 'User should be logged in.'
     assert_equal users(:chris), @controller.send(:current_user)
     assert_equal :manual, @request.session[:authentication_method]
   end
 
   def test_should_login
     post :login, :credentials => {:login => users(:chris).login, :password => 'Cruft'}
-    assert @controller.send(:logged_in?), 'User should be authenticated.'
+    assert @controller.send(:logged_in?), 'User should be logged in.'
     assert_equal users(:chris), @controller.send(:current_user)
     assert_equal :http_post, @request.session[:authentication_method]
   end
@@ -42,20 +42,20 @@ class ControllerTest < ActionController::TestCase
   def test_should_logout
     login_as(:chris)
     delete :logout
-    assert !@controller.send(:logged_in?), 'User should not be authenticated.'
+    assert !@controller.send(:logged_in?), 'User should not be logged in.'
   end
 
   def test_should_require_authentication_by_default
     assert_raises Authenticate::AuthenticationError do
       get :new
     end
-    assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert !@controller.send(:logged_in?), "User should not be logged in."
   end
   
   def test_should_authenticate_by_valid_token
     users(:chris).generate_security_token
     get :new, :security_token => users(:chris).security_token
-    assert @controller.send(:logged_in?), "User should be authenticated."
+    assert @controller.send(:logged_in?), "User should be logged in."
     assert_equal :token, @controller.instance_variable_get(:@authentication_method)
     assert_equal :token, @request.session[:authentication_method]
   end
@@ -64,7 +64,7 @@ class ControllerTest < ActionController::TestCase
     assert_raises Authenticate::AuthenticationError do
       get :new, :security_token => 'InvalidToken'
     end
-    assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert !@controller.send(:logged_in?), "User should not be logged in."
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
@@ -74,7 +74,7 @@ class ControllerTest < ActionController::TestCase
     assert_raises Authenticate::AuthenticationError do
       get :new, :security_token => users(:chris).security_token
     end
-    assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert !@controller.send(:logged_in?), "User should not be logged in."
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
   
@@ -82,7 +82,7 @@ class ControllerTest < ActionController::TestCase
     @request.session[:user] = users(:pascale).id
     users(:chris).generate_security_token
     get :new, :security_token => users(:chris).security_token
-    assert @controller.send(:logged_in?), "User should be authenticated."
+    assert @controller.send(:logged_in?), "User should be logged in."
     assert_equal :token, @controller.instance_variable_get(:@authentication_method)
     assert_equal :token, @request.session[:authentication_method]   
     assert_equal users(:chris).id, @request.session[:user]
@@ -91,7 +91,7 @@ class ControllerTest < ActionController::TestCase
   def test_should_authenticate_by_session
     @request.session[:user] = users(:chris).id
     get :new
-    assert @controller.send(:logged_in?), "User should be authenticated."
+    assert @controller.send(:logged_in?), "User should be logged in."
     assert_equal :session, @controller.instance_variable_get(:@authentication_method)
     assert_equal :session, @request.session[:authentication_method]
   end
@@ -101,14 +101,14 @@ class ControllerTest < ActionController::TestCase
     assert_raises Authenticate::AuthenticationError do
       get :new
     end
-    assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert !@controller.send(:logged_in?), "User should not be logged in."
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
   def test_should_authenticate_by_HTTP_AUTHORIZATION
     @request.env['HTTP_AUTHORIZATION'] = ActionController::HttpAuthentication::Basic.encode_credentials(users(:chris).login, 'Cruft')
     get :new
-    assert @controller.send(:logged_in?), "User should be authenticated."
+    assert @controller.send(:logged_in?), "User should be logged in."
     assert_equal :http_authentication, @controller.instance_variable_get(:@authentication_method)
     assert_equal :http_authentication, @request.session[:authentication_method]
   end
@@ -118,7 +118,7 @@ class ControllerTest < ActionController::TestCase
     assert_raises Authenticate::AuthenticationError do
       head :new
     end
-    assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert !@controller.send(:logged_in?), "User should not be logged in."
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
@@ -126,9 +126,17 @@ class ControllerTest < ActionController::TestCase
     users(:chris).generate_security_token
     @request.cookies["authentication_token"] = cookie_for(:chris)
     head :new
-    assert @controller.send(:logged_in?), "User should be authenticated."
+    assert @controller.send(:logged_in?), "User should be logged in."
     assert_equal :cookie, @controller.instance_variable_get(:@authentication_method)
     assert_equal :cookie, @request.session[:authentication_method]
+  end
+  
+  def test_should_recognize_cookie_persistence_without_explicit_login
+    users(:chris).generate_security_token
+    @request.cookies["authentication_token"] = cookie_for(:chris)
+    head :status
+    assert @controller.send(:logged_in?), "User should be logged in."
+    assert_equal :cookie, @controller.instance_variable_get(:@authentication_method)
   end
 
   def test_should_not_authenticate_by_cookie_with_invalid_token
@@ -137,7 +145,7 @@ class ControllerTest < ActionController::TestCase
     assert_raises Authenticate::AuthenticationError do
       head :new
     end
-    assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert !@controller.send(:logged_in?), "User should not be logged in."
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
 
@@ -148,7 +156,7 @@ class ControllerTest < ActionController::TestCase
     assert_raises Authenticate::AuthenticationError do
       head :new
     end
-    assert !@controller.send(:logged_in?), "User should not be authenticated."
+    assert !@controller.send(:logged_in?), "User should not be logged in."
     assert_nil @controller.instance_variable_get(:@authentication_method)
   end
   
@@ -197,7 +205,7 @@ class ControllerTest < ActionController::TestCase
       
       params = {"open_id_complete"=>"1", "openid.sig"=>"TZK7lEXXMBME5opcsUqCd3s2BB4=", "openid.return_to"=>"http://test.com/home?open_id_complete=1&openid1_claimed_id=http%3A%2F%2Fchris.myopenid.com%2F&rp_nonce=2008-09-26T19%3A39%3A16ZTMgPw9", "openid.mode"=>"id_res", "openid.op_endpoint"=>"http://www.myopenid.com/server", "rp_nonce"=>"2008-09-26T19:39:16ZTMgPw9", "openid.response_nonce"=>"2008-09-26T19:39:17Z0fqKSy", "openid.identity"=>"http://chris.myopenid.com/", "openid1_claimed_id"=>"http://chris.myopenid.com/", "openid.signed"=>"assoc_handle,identity,mode,op_endpoint,response_nonce,return_to,signed", "openid.assoc_handle"=>"{HMAC-SHA1}{48da926b}{VLBz+Q==}"}
       get :home, params
-      assert @controller.send(:logged_in?), "User should be authenticated."
+      assert @controller.send(:logged_in?), "User should be logged in."
       assert_response :success
     end
   end
