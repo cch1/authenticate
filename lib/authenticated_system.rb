@@ -27,6 +27,7 @@ module Authenticate
         session[:authentication_method] = nil
         logger.info "Authentication: User logged out (#{session[:user]})."
       end
+      @authentication_persisted = true
       session[:user] = u && u.id
     end
 
@@ -35,7 +36,7 @@ module Authenticate
     # our intent to persist authentication through to the next request.  Instead, we assume that authentication
     # with an inherently persistent method will endure and thus that any auth cookie will not expire.
     def logged_in?
-      !session[:user].nil? || authenticated? && [:session, :cookie].include?(authentication_method)
+      @authentication_persisted ? session[:user] : authenticated_user && [:session, :cookie].include?(authentication_method)
     end
     
     # Checks for an authenticated user, implicitly logging him in if present.
