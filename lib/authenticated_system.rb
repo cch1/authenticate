@@ -92,7 +92,7 @@ module Authenticate
     
     # Extract an OpenID identity URL from the credentials, if present.
     def extract_openid_identity(credentials)
-      credentials[:login] && credentials[:login].slice(/http:\/\/.*/) || credentials[:openid_identifier] || credentials[:openid_url]
+      credentials[:login] && credentials[:login].slice(/(https?|xri):\/\/.*/) || credentials[:openid_identifier] || credentials[:openid_url]
     end
     
     def open_id_store

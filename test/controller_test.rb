@@ -193,7 +193,21 @@ class ControllerTest < ActionController::TestCase
       assert !@controller.send(:logged_in?), "User should not be authenticated."
       assert_response :redirect
       assert_match /#{identity_url}/, @response.redirected_to
-    end  
+    end
+
+    def test_should_begin_authentication_by_OpenID_with_SSL
+      identity_url = 'https://openid-provider.appspot.com/corlett.chris/'
+      request = mock do
+        stubs(:return_to_args).returns(Hash.new)
+        expects(:redirect_url).returns("http://somewhere.com/?openid.identity=#{identity_url}")
+      end
+      ::OpenID::Consumer.any_instance.expects(:begin).returns(request)
+
+      post :login, :credentials => {:login => identity_url}
+      assert !@controller.send(:logged_in?), "User should not be authenticated."
+      assert_response :redirect
+      assert_match /#{identity_url}/, @response.redirected_to
+    end
 
     def test_should_complete_authentication_by_OpenID
       identity_url = users(:chris).identity_url
