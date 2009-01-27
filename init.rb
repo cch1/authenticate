@@ -3,6 +3,8 @@ require 'authenticated_system'
 require 'authenticated_user'
 require 'authenticated_test_helper'
 require 'GroupSmarts/authenticate/exceptions'
+require 'test/unit'
+
 begin
   require 'openid'
   require 'openid/store/filesystem'
