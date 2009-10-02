@@ -81,7 +81,10 @@ module Authenticate
           if u = User.authenticate(credentials[:login], credentials[:password])
             @authentication_method = request.ssl? ? :https_post : :http_post
             self.current_user = u # login
-            cookies[:authentication_token] = { :value => u.generate_security_token, :expires => u.token_expiry } if options[:remember_me]
+            if options[:remember_me]
+              u.generate_security_token
+              cookies[:authentication_token] = { :value => u.security_token, :expires => u.token_expiry }
+            end
             yield u if block_given?
           else
             handle_authentication_failure("Invalid UserID or password")
