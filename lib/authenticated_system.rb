@@ -55,7 +55,7 @@ module Authenticate
   
     # Allows current_user and logged_in? to be used in views.  Also sets up a rescue response where supported.
     def self.included(base)
-      ActionController::Base.send :helper_method, :current_user, :logged_in?
+      ActionController::Base.send :helper_method, :authenticated_user, :authenticated?, :current_user, :logged_in?
       if base.respond_to?(:rescue_responses)
         base.rescue_responses['Authenticate::AuthenticationError'] = :unauthorized # Poorly named -it really is intended for 'unauthenticated'.
       end
