@@ -1,9 +1,5 @@
 # Load authentication libs
-require 'authenticated_system'
-require 'authenticated_user'
-require 'authenticated_test_helper'
-require 'GroupSmarts/authenticate/exceptions'
-require 'test/unit'
+require 'authenticate/exceptions'
 
 begin
   require 'openid'
@@ -13,7 +9,6 @@ rescue LoadError
 end
 ActionController::Base.send :include, Authenticate::AuthenticatedSystem
 ActiveRecord::Base.extend Authenticate::AuthenticatedUser::ClassMethods
-Test::Unit::TestCase.send :include, Authenticate::AuthenticatedTestHelper
 # Set default values for macro configuration
 Authenticate::Configuration = {:realm => 'Authenticated Application', 
                                   :delete_delay => 240,
