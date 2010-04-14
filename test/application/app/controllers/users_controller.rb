@@ -1,5 +1,6 @@
 class UsersController < ActionController::Base
-  prepend_before_filter :authentication
+  append_after_filter :persist_authentication
+  append_before_filter :authentication
   skip_before_filter(:authentication, :only => ['login', 'login_simple', :status])
   
   def new

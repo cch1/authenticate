@@ -1,25 +1,24 @@
 module Authenticate
   module AuthenticatedSystem
-    
+
     protected
 
     attr_reader :authentication_method
 
-    # Assign the current user manually and persist his authentication.
+    # Assign the current user manually.
     def current_user=(u)
       @authentication_method ||= :manual
       @authenticated_user = u
-      persist_authentication(u)
     end
-    
+
     # Persist the given user's authentication across requests.
     # Semantically, this could be interpreted as "login" or "logout" operation.
     # TODO: Test behavior with sessions and cookies disabled.
-    def persist_authentication(u)
-      raise "Unknown authentication method." unless authentication_method
-      if u
+    def persist_authentication
+      if u = @authenticated_user
+        raise "Unknown authentication method." unless authentication_method
         # Could regenerate token instead for nonce behavior
-        cookies[:authentication_token] = { :value => u.security_token , :expires => u.bump_token_expiry } if cookies[:authentication_token] 
+        cookies[:authentication_token] = { :value => u.security_token , :expires => u.bump_token_expiry } if cookies[:authentication_token]
         session[:authentication_method] ||= authentication_method  # Record authentication method used at login.
         logger.info "Authentication: #{u.login} logged in via #{authentication_method}." unless session[:user] == u.id
       else # remove persistence
@@ -35,24 +34,25 @@ module Authenticate
     # (practically) allow the reading of written/outbound cookies, making it difficult to rigorously determine
     # our intent to persist authentication through to the next request.  Instead, we assume that authentication
     # with an inherently persistent method will endure and thus that any auth cookie will not expire.
+    # TODO: Deprecate this method (it thornily couples persistence and authentication) in favor of #authenticated_user
+    #       and convert it to a test helper that can be used to test strictly for autnetication persistence. 
     def logged_in?
       @authentication_persisted ? session[:user] : authenticated_user && [:session, :cookie].include?(authentication_method)
     end
-    
+
     # Checks for an authenticated user, implicitly logging him in if present.
     def authentication
       returning authenticated_user do |u|
         u ? logger.debug("Authentication: #{u.login} authenticated via #{authentication_method}.") : handle_authentication_failure
-        persist_authentication(u)
       end
     end
-    
+
     # Manage response to authentication failure.  Override this method in application.rb.
     def handle_authentication_failure(message = nil)
       raise Authenticate::AuthenticationError, message
     end
     alias access_denied handle_authentication_failure
-  
+
     # Allows current_user and logged_in? to be used in views.  Also sets up a rescue response where supported.
     def self.included(base)
       ActionController::Base.send :helper_method, :authenticated_user, :authenticated?, :current_user, :logged_in?
@@ -60,12 +60,12 @@ module Authenticate
         base.rescue_responses['Authenticate::AuthenticationError'] = :unauthorized # Poorly named -it really is intended for 'unauthenticated'.
       end
     end
-    
+
     # Authenticate the user based on provided credentials.  Credentials object can include userid, password and OpenID URLs.
-    # When the user is authenticated, the associated block is executed.  This is a high-level construct, and it takes care 
+    # When the user is authenticated, the associated block is executed.  This is a high-level construct, and it takes care
     # of login (logging and persistence).  If no parameters are provided, it attempts to extract authentication information
     # from the current request.
-    # TODO: The callback from the provider will be an HTTP GET.  To add support for POST, see OpenID::Consumer::CheckIDRequest#send_redirect? 
+    # TODO: The callback from the provider will be an HTTP GET.  To add support for POST, see OpenID::Consumer::CheckIDRequest#send_redirect?
     def authenticate(*args, &block)
       options = args.last.is_a?(::Hash) ? args.pop : params
       credentials = args.first || params[:credentials] || {}
@@ -92,17 +92,17 @@ module Authenticate
       end
     end
     private :authenticate
-    
+
     # Extract an OpenID identity URL from the credentials, if present.
     def extract_openid_identity(credentials)
       credentials[:login] && credentials[:login].slice(/(https?|xri):\/\/.*/) || credentials[:openid_identifier] || credentials[:openid_url]
     end
-    
+
     def open_id_store
       defined?(OpenIdAuthentication) ? OpenIdAuthentication.store : ::OpenID::Store::Filesystem.new(RAILS_ROOT + "/tmp/openids")
     end
-    
-    # Identifies the authenticated user, if any.  Override/chain this method to add implicit guest 
+
+    # Identifies the authenticated user, if any.  Override/chain this method to add implicit guest
     # or other application-specific authentication methods.
     # Ordering is very important for semantics as multiple authentication methods are sometimes active on a given request.
     # Rule 1: auth_cookie and session both (normally) rely on cookies, but auth_cookies are intended to provide long-term auth, not request-to-request
@@ -120,7 +120,7 @@ module Authenticate
         @authentication_method = :token if u
       end
     end
-    
+
     # Attempt to authenticate with a cookie-based security token
     def user_by_authentication_cookie
       return unless cookies[:authentication_token]
@@ -128,22 +128,22 @@ module Authenticate
         @authentication_method = :cookie if u
       end
     end
-    
+
     # Attempt to authenticate with HTTP Auth information
     def user_by_http_auth
       returning authenticate_with_http_basic { |uid, pwd| User.authenticate(uid, pwd) } do |u|
         @authentication_method = :http_authentication if u
       end
     end
-  
+
     # Attempt to authenticate with session data.
     def user_by_session
       return unless session && session[:user]
       returning User.find(session[:user]) do |u|
-        @authentication_method = :session if u # This should never be an *initial* authentication method.        
+        @authentication_method = :session if u # This should never be an *initial* authentication method.
       end
     end
-    
+
     # Attempt to authenticate with an OpenID callback.
     def user_by_openid
       return unless params && params[:open_id_complete] # If this parameter is present, let's assume OpenID gem is installed.
