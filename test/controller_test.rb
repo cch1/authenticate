@@ -36,7 +36,7 @@ class ControllerTest < ActionController::TestCase
   def test_should_remember_me
     post :login, :credentials => {:login => users(:chris).login, :password => 'Cruft'}, :remember_me => '1'
     assert users(:chris).reload.security_token
-    assert_equal users(:chris).reload.security_token, cookies["authentication_token"].first
+    assert_equal users(:chris).reload.security_token, cookies["authentication_token"]
   end
 
   def test_should_logout
@@ -165,7 +165,7 @@ class ControllerTest < ActionController::TestCase
     # Note that that cookies method below is not the same as the one used in ActionController -it is specific to the
     # test process and always returns an array of values, even if the value is a singleton.  Neither the reader nor the 
     # writer in ActionController behave this way.
-    assert token = cookies["authentication_token"].first
+    assert token = cookies["authentication_token"]
     assert_equal users(:chris), User.authenticate_by_token(token)
   end
   

@@ -10,7 +10,7 @@ load(File.dirname(__FILE__) + "/schema.rb")
 # ActiveRecord::Migrator.migrate("#{Rails.root}/db/migrate")
 
 # Set Test::Unit options for optimal performance/fidelity.
-class Test::Unit::TestCase
+class ActiveSupport::TestCase
   self.use_transactional_fixtures = true
   self.use_instantiated_fixtures  = false
   self.fixture_path = "#{RAILS_ROOT}/../fixtures"
