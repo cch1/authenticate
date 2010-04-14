@@ -1,4 +1,4 @@
-class UsersController < ActionController::Base
+class UsersController < ApplicationController
   append_after_filter :persist_authentication
   append_before_filter :authentication
   skip_before_filter(:authentication, :only => ['login', 'login_simple', :status])
@@ -29,7 +29,6 @@ class UsersController < ActionController::Base
   end
   
   def status
-    authenticated? ? "yes" : "no"
-    render :text => 'status'
+    render :text => authenticated? ? "yes" : "no"
   end
 end
