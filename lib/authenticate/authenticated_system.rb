@@ -18,7 +18,7 @@ module Authenticate
       if u = @authenticated_user
         raise "Unknown authentication method." unless authentication_method
         # Could regenerate token instead for nonce behavior
-        cookies[:authentication_token] = { :value => u.security_token , :expires => u.bump_token_expiry } if cookies[:authentication_token]
+        cookies[:authentication_token] = { :value => u.security_token , :expires => u.bump_token_expiry } unless cookies[:authentication_token].blank?
         session[:authentication_method] ||= authentication_method  # Record authentication method used at login.
         logger.info "Authentication: #{u.login} logged in via #{authentication_method}." unless session[:user] == u.id
       else # remove persistence
@@ -35,7 +35,7 @@ module Authenticate
     # our intent to persist authentication through to the next request.  Instead, we assume that authentication
     # with an inherently persistent method will endure and thus that any auth cookie will not expire.
     # TODO: Deprecate this method (it thornily couples persistence and authentication) in favor of #authenticated_user
-    #       and convert it to a test helper that can be used to test strictly for autnetication persistence. 
+    #       and convert it to a test helper that can be used to test strictly for autnetication persistence.
     def logged_in?
       @authentication_persisted ? session[:user] : authenticated_user && [:session, :cookie].include?(authentication_method)
     end
