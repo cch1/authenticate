@@ -236,7 +236,7 @@ class ControllerTest < ActionController::TestCase
   protected
     # Build a cookie with the given authentication token.
     def auth_token(token)
-      CGI::Cookie.new('name' => 'authentication_token', 'value' => token)
+      @request.cookies['authentication_token'] = token
     end
 
     # Build a cookie containing the security token of a given user.
