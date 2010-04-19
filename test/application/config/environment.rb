@@ -1,6 +1,10 @@
 require File.join(File.dirname(__FILE__), 'boot')
 require 'plugin_under_test_locator'
 
+# There is a nasty bug preventing effective use of IntegrationTests in Rails 2.3.4/2.3.5.
+# Reference: https://rails.lighthouseapp.com/projects/8994/tickets/3153
+#RAILS_GEM_VERSION = '2.3.3' unless defined? RAILS_GEM_VERSION
+
 Rails::Initializer.run do |config|
   config.cache_classes = false
   config.whiny_nils = true
@@ -13,7 +17,7 @@ Rails::Initializer.run do |config|
 
   # Your secret key for verifying cookie session data integrity.
   # If you change this key, all old sessions will become invalid!
-  # Make sure the secret is at least 30 characters and all random, 
+  # Make sure the secret is at least 30 characters and all random,
   # no regular words or you'll be exposed to dictionary attacks.
   config.action_controller.session = {
     :session_key => '_session',

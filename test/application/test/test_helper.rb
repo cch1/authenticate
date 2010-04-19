@@ -1,10 +1,10 @@
 ENV['RAILS_ENV'] ||= 'test'
-require File.expand_path(File.dirname(__FILE__) + "/application/config/environment")
+require File.expand_path(File.dirname(__FILE__) + "/../config/environment")
 require 'test_help'
 
 # From this point forward, we can assume that we have booted a generic Rails environment plus
 # our (booted) plugin.
-load(File.dirname(__FILE__) + "/schema.rb")
+load(File.dirname(__FILE__) + "/../db/schema.rb")
 
 # Run the migrations (optional)
 # ActiveRecord::Migrator.migrate("#{Rails.root}/db/migrate")
@@ -14,7 +14,6 @@ class ActiveSupport::TestCase
   include Authenticate::AuthenticatedTestHelper
   self.use_transactional_fixtures = true
   self.use_instantiated_fixtures  = false
-  self.fixture_path = "#{RAILS_ROOT}/../fixtures"
   
   def self.uses_mocha(description)
     require 'mocha'

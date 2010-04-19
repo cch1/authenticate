@@ -21,3 +21,5 @@ mysql: &mysql
   database: plugin_test
 test:
   <<: *<%= ENV['DB'] || 'sqlite3_memory' %>
+development:
+  <<: *<%= ENV['DB'] || 'sqlite3_memory' %>
