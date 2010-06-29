@@ -155,7 +155,7 @@ module Authenticate
 
       # Generate a new security token valid for hours hours.  The token is Base64 encoded and stripped of newlines for URL and DB safety.
       def new_security_token(hours)
-        token_length = User.columns_hash["security_token"].limit
+        token_length = self.class.columns_hash["security_token"].limit
         returning Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0, token_length] do |token|
           self.security_token = token
           self.token_expiry = hours.hours.from_now
