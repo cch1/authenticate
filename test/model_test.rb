@@ -169,4 +169,12 @@ class ModelTest < ActiveSupport::TestCase
     u.password = u.password
     assert u.password?(pw)
   end
+
+  def test_encryption
+    cleartext = "This is clear"
+    key = "RandomStuffAtLeastAsLongAsCleartext"
+    ciphertext = User.encrypt(key, cleartext)
+    assert_not_equal cleartext, ciphertext
+    assert_equal cleartext, User.decrypt(key, ciphertext)
+  end
 end

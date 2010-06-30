@@ -68,15 +68,19 @@ module Authenticate
         key[0, hash_length]
       end
 
-      # Encrypt the password with reversible encryption
-      def encrypt(salt, cleartext)
-        return cleartext unless cleartext && salt
-        Base64.encode64(cleartext)
+      # Encrypt the password with reversible XOR encryption.
+      def encrypt(key, cleartext)
+        return cleartext unless cleartext && key
+        raise "Key must be at least as long as cleartext" unless key.length >= cleartext.length
+        ciphertext = cleartext.each_byte.zip(key.each_byte).inject(""){|m, (c, k)| m << (c ^ k)}
+        Base64.encode64(ciphertext)
       end
 
-      def decrypt(salt, ciphertext)
-        return ciphertext unless ciphertext && salt
-        Base64.decode64(ciphertext)
+      def decrypt(key, ciphertext)
+        return ciphertext unless ciphertext && key
+        ciphertext = Base64.decode64(ciphertext)
+        raise "Key must be at least as long as ciphertext" unless key.length >= ciphertext.length
+        ciphertext.each_byte.zip(key.each_byte).inject(""){|m, (c, k)| m << (c ^ k)}
       end
     end
 
@@ -135,7 +139,7 @@ module Authenticate
       end
 
       # Return a reversibly encrypted version of the password.  Note that the encryption preserves gross
-      # characteristics for validation purposes, but is only marginally secure.  Never store this value, 
+      # characteristics for validation purposes, but is only marginally secure.  Never store this value,
       # and consider additional security measures (SSL, for example) if it is transmitted.
       def password
         @password && self.class.encrypt(salt, @password)
