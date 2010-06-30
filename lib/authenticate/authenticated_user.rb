@@ -51,13 +51,13 @@ module Authenticate
         [Array.new(0.75 * salt_length){rand(256).chr}.join].pack("m").gsub(/\n/, '')[0, salt_length]
       end
 
-      # Hash the password and salt iteratively.  The value of iteration has apparently been questioned in the cryptographic
+      # Hash the password and salt iteratively to produce a digest.  Iteration has been questioned in the cryptographic
       # community (see reference one below), but assumed practical in the applied art of password management (as shown in
       # references two and three) in increasing the amount of time required to execute a dictionary attack.
       # http://www.linuxworld.com/cgi-bin/mailto/x_linux.cgi?pagetosend=/export/home/httpd/linuxworld/news/2007/111207-hash.html
       # http://macshadows.com/kb/index.php?title=Mac_OS_X_password_hashes
       # http://www.adamberent.com/documents/KeyIterations&CryptoSalts.pdf
-      def hash(salt, password)
+      def fingerprint(salt, password)
         return password unless password && salt
         hash_length = self.columns_hash['hashed_password'].limit
         iterated_hash_length = Authenticate::Configuration[:compatibility_mode] ? hash_length : 0
@@ -86,7 +86,7 @@ module Authenticate
 
     module InstanceMethods
       def password?(password)
-        self.class.hash(self.salt, password) == self.hashed_password
+        self.class.fingerprint(self.salt, password) == self.hashed_password
       end
 
       def valid_token?
@@ -134,7 +134,7 @@ module Authenticate
       # in the second password not being saved.
       def password=(pw)
         return pw if self.class.decrypt(salt, pw) == @password # Don't doubly encrypt external representation
-        self.hashed_password = self.class.hash(salt, pw)
+        self.hashed_password = self.class.fingerprint(salt, pw)
         @password = pw
       end
 

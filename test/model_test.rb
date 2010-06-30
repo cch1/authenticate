@@ -177,4 +177,17 @@ class ModelTest < ActiveSupport::TestCase
     assert_not_equal cleartext, ciphertext
     assert_equal cleartext, User.decrypt(key, ciphertext)
   end
+
+  def test_hashability
+    h = Hash.new
+    assert_nothing_raised do
+      h[User] = true
+    end
+  end
+
+  def test_round_trip
+    assert u = User.create({:login => 'newUser', :password => 'aPassword'})
+    u.password = u.password
+    assert !u.changed?
+  end
 end
