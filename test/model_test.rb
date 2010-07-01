@@ -140,6 +140,15 @@ class ModelTest < ActiveSupport::TestCase
 
   # Test blank passwords.  To disable blank passwords use
   # validates_presence_of :password, :if => :validate_password?
+  def test_clear_password
+    u = users(:chris)
+    assert !u.password?(nil)
+    u.clear_password!
+    assert u.password?(nil)
+    assert u.save
+    assert u.password?(nil)
+  end
+
   def test_should_create_user_with_blank_password
     u = User.new({:login => 'newUser', :password => ''})
     assert u.password?('')

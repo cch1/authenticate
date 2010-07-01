@@ -133,9 +133,8 @@ module Authenticate
         self.password_confirmation = confirm
       end
 
-      # Change the user's password to the given password.
-      # NB: Setting the password to the mask value after intially setting it to any other value will result
-      # in the second password not being saved.
+      # Change the user's password to the given password.  It is not possible to change an unknowable
+      # password to nil with this setter -use #clear_password! instead.
       def password=(pw)
         return pw if pw == self.class.mask(@_password) # This is assumed to be a round-trip scenario.
         self.hashed_password = self.class.fingerprint(salt, pw)
@@ -148,8 +147,15 @@ module Authenticate
         self.class.mask(@_password)
       end
 
+      # Because nil is a sentinel value (representing an unknownable password), an
+      # out-of-band method must be used to clear a password (set it to nil).
+      def clear_password!
+        self.hashed_password = self.class.fingerprint(salt, nil)
+        @_password = nil
+      end
+
       def password_confirmation=(pwc)
-        return pwc if pwc == self.class.mask(@_password_confirmation) # Don't doubly mask external representation
+        return pwc if pwc == self.class.mask(@_password_confirmation) # This is assumed to be a round-trip scenario.
         @_password_confirmation = pwc
       end
 
