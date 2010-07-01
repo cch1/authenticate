@@ -170,7 +170,7 @@ class ModelTest < ActiveSupport::TestCase
     assert_in_delta Authenticate::Configuration[:security_token_life].hours.from_now, users(:pascale).token_expiry, 1
   end
 
-  # Obfuscate the cleartext password immediately with a value that "look" right in HTML forms.
+  # Obfuscate the cleartext password immediately with a value that "looks" right in HTML forms.
   def test_should_obfuscate_password_on_set
     pw = 'newPassword'
     u = User.new({:login => 'newUser', :password => pw, :password_confirmation => pw})
@@ -178,7 +178,7 @@ class ModelTest < ActiveSupport::TestCase
     assert_not_nil u.password
   end
 
-  # Obfuscate the cleartext password_confirmation immediately with a value that "look" right in HTML forms.
+  # Obfuscate the cleartext password_confirmation immediately with a value that "looks" right in HTML forms.
   def test_should_obfuscate_password_confirmation_on_set
     @picky_user.instance_eval do
       validates_confirmation_of :password
@@ -196,14 +196,6 @@ class ModelTest < ActiveSupport::TestCase
     u = User.new({:login => 'newUser', :password => pw})
     u.password = u.password
     assert u.password?(pw)
-  end
-
-  def test_encryption
-    cleartext = "This is clear"
-    key = "RandomStuffAtLeastAsLongAsCleartext"
-    ciphertext = User.encrypt(key, cleartext)
-    assert_not_equal cleartext, ciphertext
-    assert_equal cleartext, User.decrypt(key, ciphertext)
   end
 
   def test_hashability

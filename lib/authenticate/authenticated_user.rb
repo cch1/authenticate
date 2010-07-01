@@ -3,7 +3,6 @@ module Authenticate
     module ClassMethods
       def authenticated
         require 'digest/sha2'
-        require 'base64'
 
         attr_reader :_password
 
@@ -83,19 +82,9 @@ module Authenticate
         key[0, hash_length]
       end
 
-      # Encrypt the password with reversible XOR encryption.
-      def encrypt(key, cleartext)
-        return cleartext unless cleartext && key
-        raise "Key must be at least as long as cleartext" unless key.length >= cleartext.length
-        ciphertext = cleartext.each_byte.zip(key.each_byte).inject(""){|m, (c, k)| m << (c ^ k)}
-        Base64.encode64(ciphertext).chomp
-      end
-
-      def decrypt(key, ciphertext)
-        return ciphertext unless ciphertext && key
-        ciphertext = Base64.decode64(ciphertext)
-        raise "Key must be at least as long as ciphertext" unless key.length >= ciphertext.length
-        ciphertext.each_byte.zip(key.each_byte).inject(""){|m, (c, k)| m << (c ^ k)}
+      # Encrypt the password with reversible XOR maskion.
+      def mask(cleartext)
+        cleartext && '*' * cleartext.length
       end
     end
 
@@ -144,29 +133,28 @@ module Authenticate
         self.password_confirmation = confirm
       end
 
-      # Change the user's password to the given password and trigger encryption to occur on validation.
+      # Change the user's password to the given password.
       # NB: Setting the password to the mask value after intially setting it to any other value will result
       # in the second password not being saved.
       def password=(pw)
-        return pw if self.class.decrypt(salt, pw) == @_password # Don't doubly encrypt external representation
+        return pw if pw == self.class.mask(@_password) # This is assumed to be a round-trip scenario.
         self.hashed_password = self.class.fingerprint(salt, pw)
         @_password = pw
       end
 
-      # Return a reversibly encrypted version of the password.  Note that the encryption preserves gross
-      # characteristics for validation purposes, but is only marginally secure.  Never store this value,
-      # and consider additional security measures (SSL, for example) if it is transmitted.
+      # Return a masked version of the password.  Note that the masking preserves gross
+      # characteristics for visual feedback only.
       def password
-        @_password && self.class.encrypt(salt, @_password)
+        self.class.mask(@_password)
       end
 
       def password_confirmation=(pwc)
-        return pwc if self.class.decrypt(salt, pwc) == @_password_confirmation # Don't doubly encrypt external representation
+        return pwc if pwc == self.class.mask(@_password_confirmation) # Don't doubly mask external representation
         @_password_confirmation = pwc
       end
 
       def password_confirmation
-        @_password_confirmation && self.class.encrypt(salt, @_password_confirmation)
+        self.class.mask(@_password_confirmation)
       end
 
       # Normalize the OpenID identity URL on assignment
