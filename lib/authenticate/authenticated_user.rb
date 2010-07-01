@@ -18,28 +18,47 @@ module Authenticate
       # This nasty macro creates accessors that can't be replaced by included modules, so we intercept it when
       # applied to the password attribute and replace with our own version.
       def validates_confirmation_of(*args)
-        return super unless args.first == :password
-        attr_reader :_password_confirmation
-        config = {:on => :save}.merge(args.extract_options!)
-        validates_each(:password, config) do |record, attr_name, value|
-          unless record._password_confirmation.nil? or value == record._password_confirmation
-            record.errors.add(attr_name, :confirmation, :default => config[:message])
+        options = args.extract_options!.symbolize_keys
+        safe_attrs = args.flatten.reject{|attr| :password == attr}
+        super(*(safe_attrs << options), &block) if safe_attrs.any?
+        if args.flatten.include?(:password)
+          attr_reader :_password_confirmation
+          config = {:on => :save}.merge(options)
+          validates_each(:password, config) do |record, attr_name, value|
+            unless record._password_confirmation.nil? or value == record._password_confirmation
+              record.errors.add(attr_name, :confirmation, :default => config[:message])
+            end
           end
         end
       end
 
-      # Use cleartext password values for "standard" validations (validates_X_of).
+      # This is a special case where presence is indirectly inferred and Rails does not use
+      # #validates_each
+      def validates_presence_of(*args, &block)
+        options = args.extract_options!.symbolize_keys
+        safe_attrs = args.flatten.reject{|attr| :password == attr}
+        super(*(safe_attrs << options), &block) if safe_attrs.any?
+        if args.flatten.include?(:password)
+          config = {:on => :save}.merge(options)
+          send(validation_method(config[:on]), config) do |record|
+            invalid = [nil, fingerprint(record.salt, '')]
+            record.errors.add(:password, :blank, :default => config[:message]) if invalid.include?(record.hashed_password)
+          end
+        end
+      end
+
+      # Use cleartext password values for "standard" validations (validates_X_of) and only apply
+      # them when we have testable values.
       def validates_each(*args, &block)
-       options = args.extract_options!.symbolize_keys
-       attrs = args.flatten.partition{|attr| [:password, :password_confirmation].include?(attr)}
-       super(*(attrs.last << options), &block) if attrs.last.any?
-       send(validation_method(options[:on] || :save), options) do |record|
-         attrs.first.each do |attr|
-           value = record.send("_#{attr}") # Get the cleartext version
-           next if (value.nil? && options[:allow_nil]) || (value.blank? && options[:allow_blank])
-           yield record, attr, value
-         end
-       end if attrs.first.any?
+        options = args.extract_options!.symbolize_keys
+        safe_attrs = args.flatten.reject{|attr| :password == attr}
+        super(*(safe_attrs << options), &block) if safe_attrs.any?
+        if args.flatten.include?(:password)
+          send(validation_method(options[:on] || :save), options) do |record|
+            value = record._password # Get the cleartext version
+            yield record, :password, value unless value.nil? || (value.blank? && options[:allow_blank])
+          end
+        end
       end
     end
 
