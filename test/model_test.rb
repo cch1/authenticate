@@ -8,8 +8,6 @@ class ModelTest < ActiveSupport::TestCase
       set_table_name 'users'
       def self.name; "PickyUser"; end
       authenticated
-      validates_confirmation_of :password
-      validates_length_of :password, { :in => 3..50, :on => :create }
     end
   end
 
@@ -46,7 +44,7 @@ class ModelTest < ActiveSupport::TestCase
     assert_nil User.authenticate(u.login, "Rennes") # is the old one invalid?
   end
 
-  def test_should_change_password
+  def test_should_persist_changed_password
     u = users(:pascale)
     u.password = "Lyon"
     assert u.save
@@ -55,14 +53,17 @@ class ModelTest < ActiveSupport::TestCase
   end
 
   def test_validation_preserves_state
-    u = @picky_user.new(:password => "S")
+    @picky_user.instance_eval do
+      validates_confirmation_of :password
+    end
+    u = @picky_user.new(:login => 'me', :password => 'apassword', :password_confirmation => 'bpassword')
     assert !u.valid?
     assert !u.valid?
   end
 
   def test_should_allow_validating_presence_of_password_against_nil_password
     @picky_user.instance_eval do
-      validates_presence_of :password
+      validates_presence_of :password, :on => :create
     end
     u = @picky_user.new(:login => 'me', :password => nil)
     assert !u.valid?
@@ -71,7 +72,7 @@ class ModelTest < ActiveSupport::TestCase
 
   def test_should_allow_validating_presence_of_password_against_blank_password
     @picky_user.instance_eval do
-      validates_presence_of :password
+      validates_presence_of :password, :on => :create
     end
     u = @picky_user.new(:login => 'me', :password => '')
     assert !u.valid?
@@ -83,6 +84,22 @@ class ModelTest < ActiveSupport::TestCase
       validates_confirmation_of :password
     end
     u = @picky_user.new(:login => 'me', :password => 'apassword', :password_confirmation => 'bpassword')
+    assert !u.valid?
+    assert u.errors[:password]
+    u = @picky_user.new(:login => 'metoo', :password => 'apassword', :password_confirmation => 'apassword')
+    assert u.valid?
+  end
+
+  def test_should_map_validations
+    pw = "TheOne"
+    tc = self
+    @picky_user.instance_eval do
+      validates_each :password do |record, attr, value|
+        tc.assert_equal pw, value
+        record.errors.add(attr, :confirmation, :default => "No, I am")
+      end
+    end
+    u = @picky_user.new(:login => 'me', :password => pw, :password_confirmation => pw)
     assert !u.valid?
     assert u.errors[:password]
   end
@@ -101,20 +118,22 @@ class ModelTest < ActiveSupport::TestCase
   # Test creation of a user with minimal information.
   def test_should_create_valid_user
     u = User.new({:login => 'newUser'})
-    assert u.save
+    assert u.valid?
   end
 
   # Test the ability to create a user and set the password in one step.
   def test_should_create_user_with_password
     u = User.new({:login => 'newUser', :password => "x"})
+    assert u.password?('x')
     assert u.save
     assert u.password?('x')
   end
 
   # Test nil passwords.  To disable nil passwords, use a database restriction
-  # or a custom validation that examines the password virtual attribute.
+  # or a custom validation that examines the password virtual attribute on create.
   def test_should_create_user_with_nil_password
     u = User.new({:login => 'newUser'})
+    assert u.password?(nil)
     assert u.save
     assert u.password?(nil)
   end
@@ -123,6 +142,7 @@ class ModelTest < ActiveSupport::TestCase
   # validates_presence_of :password, :if => :validate_password?
   def test_should_create_user_with_blank_password
     u = User.new({:login => 'newUser', :password => ''})
+    assert u.password?('')
     assert u.save
     assert u.password?('')
   end
@@ -150,15 +170,23 @@ class ModelTest < ActiveSupport::TestCase
     assert_in_delta Authenticate::Configuration[:security_token_life].hours.from_now, users(:pascale).token_expiry, 1
   end
 
-  # Obfuscate the cleartext password immediately with values that "look" right in HTML forms.
+  # Obfuscate the cleartext password immediately with a value that "look" right in HTML forms.
   def test_should_obfuscate_password_on_set
     pw = 'newPassword'
     u = User.new({:login => 'newUser', :password => pw, :password_confirmation => pw})
     assert_not_equal pw, u.password
-    assert_not_equal pw, u.password_confirmation
     assert_not_nil u.password
+  end
+
+  # Obfuscate the cleartext password_confirmation immediately with a value that "look" right in HTML forms.
+  def test_should_obfuscate_password_confirmation_on_set
+    @picky_user.instance_eval do
+      validates_confirmation_of :password
+    end
+    pw = 'newPassword'
+    u = @picky_user.new({:login => 'newUser', :password => pw, :password_confirmation => pw})
+    assert_not_equal pw, u.password_confirmation
     assert_not_nil u.password_confirmation
-    assert u.password?(pw)
   end
 
   # Setting the password to the current value of the virtual attribute (including the mask) should not

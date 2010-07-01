@@ -5,7 +5,7 @@ module Authenticate
         require 'digest/sha2'
         require 'base64'
 
-        attr_writer :password_confirmation
+        attr_reader :_password
 
         validates_presence_of :login
         validates_uniqueness_of :login
@@ -20,12 +20,27 @@ module Authenticate
       # applied to the password attribute and replace with our own version.
       def validates_confirmation_of(*args)
         return super unless args.first == :password
+        attr_reader :_password_confirmation
         config = {:on => :save}.merge(args.extract_options!)
         validates_each(:password, config) do |record, attr_name, value|
-          unless record.password_confirmation.nil? or value == record.password_confirmation
-            record.errors.add(:password, :confirmation, :default => config[:message])
+          unless record._password_confirmation.nil? or value == record._password_confirmation
+            record.errors.add(attr_name, :confirmation, :default => config[:message])
           end
         end
+      end
+
+      # Use cleartext password values for "standard" validations (validates_X_of).
+      def validates_each(*args, &block)
+       options = args.extract_options!.symbolize_keys
+       attrs = args.flatten.partition{|attr| [:password, :password_confirmation].include?(attr)}
+       super(*(attrs.last << options), &block) if attrs.last.any?
+       send(validation_method(options[:on] || :save), options) do |record|
+         attrs.first.each do |attr|
+           value = record.send("_#{attr}") # Get the cleartext version
+           next if (value.nil? && options[:allow_nil]) || (value.blank? && options[:allow_blank])
+           yield record, attr, value
+         end
+       end if attrs.first.any?
       end
     end
 
@@ -133,20 +148,25 @@ module Authenticate
       # NB: Setting the password to the mask value after intially setting it to any other value will result
       # in the second password not being saved.
       def password=(pw)
-        return pw if self.class.decrypt(salt, pw) == @password # Don't doubly encrypt external representation
+        return pw if self.class.decrypt(salt, pw) == @_password # Don't doubly encrypt external representation
         self.hashed_password = self.class.fingerprint(salt, pw)
-        @password = pw
+        @_password = pw
       end
 
       # Return a reversibly encrypted version of the password.  Note that the encryption preserves gross
       # characteristics for validation purposes, but is only marginally secure.  Never store this value,
       # and consider additional security measures (SSL, for example) if it is transmitted.
       def password
-        @password && self.class.encrypt(salt, @password)
+        @_password && self.class.encrypt(salt, @_password)
+      end
+
+      def password_confirmation=(pwc)
+        return pwc if self.class.decrypt(salt, pwc) == @_password_confirmation # Don't doubly encrypt external representation
+        @_password_confirmation = pwc
       end
 
       def password_confirmation
-        @password_confirmation && self.class.encrypt(salt, @password_confirmation)
+        @_password_confirmation && self.class.encrypt(salt, @_password_confirmation)
       end
 
       # Normalize the OpenID identity URL on assignment
@@ -162,7 +182,7 @@ module Authenticate
 
       # Expunge cleartext password from memory
       def clear_password
-        @password = @password_confirmation = nil
+        @_password = @_password_confirmation = nil
       end
 
       # Generate a new security token valid for hours hours.  The token is Base64 encoded and stripped of newlines for URL and DB safety.
