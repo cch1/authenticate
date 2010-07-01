@@ -73,7 +73,7 @@ module Authenticate
         return cleartext unless cleartext && key
         raise "Key must be at least as long as cleartext" unless key.length >= cleartext.length
         ciphertext = cleartext.each_byte.zip(key.each_byte).inject(""){|m, (c, k)| m << (c ^ k)}
-        Base64.encode64(ciphertext)
+        Base64.encode64(ciphertext).chomp
       end
 
       def decrypt(key, ciphertext)
