@@ -125,7 +125,10 @@ module Authenticate
         raise "Can't bump token expiration when token has not been set." unless security_token
         returning h.hours.from_now do |t|
           self.token_expiry = t
-          update_without_callbacks
+          # This code smell reflects poor modelling: authentication is not identification, and auth tokens should not be
+          # attributes of a User.  We use the class method so as to not fail due to unrelated validations (or accidentally
+          # update the user with invalid attributes).
+          self.class.update_all({:token_expiry => token_expiry}, {:id => self.id})
         end
       end
 
@@ -204,7 +207,7 @@ module Authenticate
         returning Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0, token_length] do |token|
           self.security_token = token
           self.token_expiry = hours.hours.from_now
-          update_without_callbacks
+          self.class.update_all({:token_expiry => token_expiry, :security_token => security_token}, {:id => self.id})
         end
       end
     end # module

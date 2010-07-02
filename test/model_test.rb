@@ -182,6 +182,31 @@ class ModelTest < ActiveSupport::TestCase
     assert_in_delta Authenticate::Configuration[:security_token_life].hours.from_now, users(:pascale).token_expiry, 1
   end
 
+  def test_token_generation_updates_only_token_data_unconditionally
+    assert u = users(:chris)
+    login = u.login
+    u.login = users(:pascale).login # invalid
+    assert !u.valid?
+    t = u.security_token!
+    u.reload
+    assert_equal login, u.login # Did not update login
+    assert_equal t, u.security_token # Did set token
+    assert_operator Time.now, :<, u.token_expiry # Did set expiry
+  end
+
+  def test_token_bump_updates_only_token_expiry_unconditionally
+    assert u = users(:pascale)
+    login = u.login
+    u.login = users(:chris).login # invalid
+    assert !u.valid?
+    t0 = u.token_expiry
+    t1 = u.bump_token_expiry(123)
+    assert_not_equal t0, t1 # Make sure we are really bumping
+    u.reload
+    assert_equal login, u.login # Did not update login
+    assert_in_delta t1, u.token_expiry, 1 # Did update expiry (within precision of DB field)
+  end
+
   # Obfuscate the cleartext password immediately with a value that "looks" right in HTML forms.
   def test_obfuscate_password_on_set
     pw = 'newPassword'
