@@ -20,11 +20,9 @@ module Authenticate
         # Could regenerate token instead for nonce behavior
         cookies[:authentication_token] = { :value => u.security_token , :expires => u.bump_token_expiry } unless cookies[:authentication_token].blank?
         session[:authentication_method] ||= authentication_method  # Record authentication method used at login.
-        logger.info "Authentication: #{u.login} logged in via #{authentication_method}." unless session[:user] == u.id
       else # remove persistence
         cookies.delete :authentication_token
         session[:authentication_method] = nil
-        logger.info "Authentication: User logged out (#{session[:user]})."
       end
       @authentication_persisted = true
       session[:user] = u && u.id
@@ -42,7 +40,7 @@ module Authenticate
 
     # Checks for an authenticated user, implicitly logging him in if present.
     def authentication
-      returning authenticated_user do |u|
+      authenticated_user.tap do |u|
         u ? logger.debug("Authentication: #{u.login} authenticated via #{authentication_method}.") : handle_authentication_failure
       end
     end
@@ -116,7 +114,7 @@ module Authenticate
     # Attempt to authenticate with a URL-encoded security token.  Remove the token from the parameters if present.
     def user_by_token
       return unless params && params[:security_token]
-      returning User.authenticate_by_token(params[:security_token]) do |u|
+      User.authenticate_by_token(params[:security_token]).tap do |u|
         @authentication_method = :token if u
       end
     end
@@ -124,14 +122,14 @@ module Authenticate
     # Attempt to authenticate with a cookie-based security token
     def user_by_authentication_cookie
       return unless cookies[:authentication_token]
-      returning User.authenticate_by_token(cookies[:authentication_token]) do |u|
+      User.authenticate_by_token(cookies[:authentication_token]).tap do |u|
         @authentication_method = :cookie if u
       end
     end
 
     # Attempt to authenticate with HTTP Auth information
     def user_by_http_auth
-      returning authenticate_with_http_basic { |uid, pwd| User.authenticate(uid, pwd) } do |u|
+      authenticate_with_http_basic { |uid, pwd| User.authenticate(uid, pwd) }.tap do |u|
         @authentication_method = :http_authentication if u
       end
     end
@@ -139,7 +137,7 @@ module Authenticate
     # Attempt to authenticate with session data.
     def user_by_session
       return unless session && session[:user]
-      returning User.find(session[:user]) do |u|
+      User.find(session[:user]).tap do |u|
         @authentication_method = :session if u # This should never be an *initial* authentication method.
       end
     end
@@ -154,7 +152,7 @@ module Authenticate
       open_id_response = OpenID::Consumer.new(session, open_id_store).complete(original_parameters, request.url)
       case open_id_response.status
         when OpenID::Consumer::SUCCESS
-          returning User.find_by_identity_url(open_id_response.identity_url) do |u|
+          User.find_by_identity_url(open_id_response.identity_url).tap do |u|
             @authentication_method = :openid if u
             raise UnknownIdentityURL unless u
           end

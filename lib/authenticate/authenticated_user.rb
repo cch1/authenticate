@@ -123,7 +123,7 @@ module Authenticate
 
       def bump_token_expiry(h = Authenticate::Configuration[:security_token_life])
         raise "Can't bump token expiration when token has not been set." unless security_token
-        returning h.hours.from_now do |t|
+        h.hours.from_now.tap do |t|
           self.token_expiry = t
           # This code smell reflects poor modelling: authentication is not identification, and auth tokens should not be
           # attributes of a User.  We use the class method so as to not fail due to unrelated validations (or accidentally
@@ -204,7 +204,7 @@ module Authenticate
       # Generate a new security token valid for hours hours.  The token is Base64 encoded and stripped of newlines for URL and DB safety.
       def new_security_token(hours)
         token_length = self.class.columns_hash["security_token"].limit
-        returning Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0, token_length] do |token|
+        Digest::SHA512.hexdigest([Array.new(0.75 * token_length){rand(256).chr}.join].pack("m").gsub(/\n/, ''))[0, token_length].tap do |token|
           self.security_token = token
           self.token_expiry = hours.hours.from_now
           self.class.update_all({:token_expiry => token_expiry, :security_token => security_token}, {:id => self.id})
